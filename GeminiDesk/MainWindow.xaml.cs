@@ -294,6 +294,7 @@ public partial class MainWindow : Window
         var modelMessage = new ChatMessage(string.Empty, false, [], []);
         modelMessage.IsStreaming = true;
         Messages.Add(modelMessage);
+        UpdateRegenerateAvailability();
         PromptBox.Clear();
         ScrollToLatestMessage();
         _generationCancellation = new CancellationTokenSource();
@@ -422,6 +423,7 @@ public partial class MainWindow : Window
             _chatStore.SaveMessage(_currentConversationId, userMessage);
             _chatStore.SaveMessage(_currentConversationId, modelMessage);
             RefreshConversations();
+            UpdateRegenerateAvailability();
             StatusText.Text = successStatus;
         }
         catch (Exception storageException)
@@ -599,6 +601,7 @@ public partial class MainWindow : Window
             });
         }
 
+        UpdateRegenerateAvailability();
         StatusText.Text = "저장된 대화를 불러왔습니다";
         ScrollToLatestMessage();
         PromptBox.Focus();
@@ -840,6 +843,195 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private void CopyResponseButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement element ||
+            element.Tag is not ChatMessage message ||
+            string.IsNullOrEmpty(message.Text))
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(message.Text);
+            StatusText.Text = "Gemini 응답 전체를 복사했어요";
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                $"응답을 클립보드에 복사하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                "복사 오류",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private async void RegenerateResponseButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement element || element.Tag is not ChatMessage modelMessage)
+        {
+            return;
+        }
+
+        await RegenerateLatestResponseAsync(modelMessage);
+    }
+
+    private async Task RegenerateLatestResponseAsync(ChatMessage modelMessage)
+    {
+        if (_generationCancellation is not null ||
+            !modelMessage.CanRegenerate ||
+            !ReferenceEquals(Messages.LastOrDefault(), modelMessage) ||
+            _currentConversationId is null ||
+            _conversationHistory.Count < 2 ||
+            !string.Equals(_conversationHistory[^1].Role, "model", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var apiKey = NormalizeApiKey(ApiKeyBox.Password);
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            MessageBox.Show(
+                "Gemini API 키를 입력해 주세요.",
+                "API 키 필요",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            ApiKeyBox.Focus();
+            return;
+        }
+
+        if (apiKey != ApiKeyBox.Password)
+        {
+            ApiKeyBox.Password = apiKey;
+        }
+
+        var originalText = modelMessage.Text;
+        var originalSources = modelMessage.Sources.ToList();
+        var originalContent = _conversationHistory[^1];
+        _conversationHistory.RemoveAt(_conversationHistory.Count - 1);
+
+        modelMessage.CanRegenerate = false;
+        modelMessage.Text = string.Empty;
+        modelMessage.Sources = [];
+        modelMessage.IsStreaming = true;
+        _generationCancellation = new CancellationTokenSource();
+        SetBusy(true);
+        ScrollToLatestMessage();
+
+        try
+        {
+            var client = new Client(apiKey: apiKey);
+            var config = WebSearchCheckBox.IsChecked == true
+                ? new GenerateContentConfig
+                {
+                    Tools = [new Tool { GoogleSearch = new GoogleSearch() }]
+                }
+                : null;
+            var collectedSources = new List<ChatSource>();
+
+            await foreach (var chunk in client.Models.GenerateContentStreamAsync(
+                               model: ModelName,
+                               contents: _conversationHistory.ToList(),
+                               config: config,
+                               cancellationToken: _generationCancellation.Token))
+            {
+                var chunkText = string.Concat(chunk.Candidates?
+                    .SelectMany(candidate => candidate.Content?.Parts ?? [])
+                    .Select(part => part.Text)
+                    .Where(text => !string.IsNullOrEmpty(text)) ?? []);
+
+                if (!string.IsNullOrEmpty(chunkText))
+                {
+                    modelMessage.Text += chunkText;
+                    ScrollToLatestMessage();
+                }
+
+                collectedSources.AddRange(ExtractSources(chunk));
+            }
+
+            if (string.IsNullOrWhiteSpace(modelMessage.Text))
+            {
+                modelMessage.Text = "응답 내용이 없습니다.";
+            }
+
+            modelMessage.Sources = collectedSources
+                .DistinctBy(source => source.Uri)
+                .ToList();
+            modelMessage.IsStreaming = false;
+
+            _chatStore.ReplaceLatestModelMessage(_currentConversationId, modelMessage);
+            _conversationHistory.Add(new Content
+            {
+                Role = "model",
+                Parts = [new Part { Text = modelMessage.Text }]
+            });
+            SaveRememberedApiKey(showConfirmation: false);
+            UpdateRegenerateAvailability();
+
+            try
+            {
+                RefreshConversations();
+                StatusText.Text = "Gemini 답변을 다시 만들었어요 · 저장됨";
+            }
+            catch
+            {
+                StatusText.Text = "다시 만든 답변은 저장됨 · 대화 목록 새로고침 실패";
+            }
+        }
+        catch (OperationCanceledException) when (_generationCancellation.IsCancellationRequested)
+        {
+            RestoreOriginalResponse(modelMessage, originalText, originalSources, originalContent);
+            StatusText.Text = "답변 다시 생성을 중지했어요";
+        }
+        catch (Exception exception)
+        {
+            RestoreOriginalResponse(modelMessage, originalText, originalSources, originalContent);
+            StatusText.Text = "답변 다시 생성 실패";
+            MessageBox.Show(
+                $"답변을 다시 생성하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                "다시 생성 오류",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _generationCancellation?.Dispose();
+            _generationCancellation = null;
+            SetBusy(false);
+            ScrollToLatestMessage();
+            PromptBox.Focus();
+        }
+    }
+
+    private void RestoreOriginalResponse(
+        ChatMessage modelMessage,
+        string originalText,
+        IReadOnlyList<ChatSource> originalSources,
+        Content originalContent)
+    {
+        modelMessage.Text = originalText;
+        modelMessage.Sources = originalSources;
+        modelMessage.IsStreaming = false;
+        _conversationHistory.Add(originalContent);
+        UpdateRegenerateAvailability();
+    }
+
+    private void UpdateRegenerateAvailability()
+    {
+        foreach (var message in Messages.Where(message => !message.IsUser))
+        {
+            message.CanRegenerate = false;
+        }
+
+        if (Messages.LastOrDefault() is { IsUser: false, IsStreaming: false } lastMessage &&
+            _currentConversationId is not null &&
+            _conversationHistory.LastOrDefault() is { Role: "model" })
+        {
+            lastMessage.CanRegenerate = true;
+        }
+    }
+
     private void SetBusy(bool isBusy)
     {
         SendButton.IsEnabled = true;
@@ -877,6 +1069,7 @@ public sealed class ChatMessage : INotifyPropertyChanged
 {
     private string _text;
     private IReadOnlyList<ChatSource> _sources;
+    private bool _canRegenerate;
     private bool _isStreaming;
 
     public ChatMessage(
@@ -907,6 +1100,21 @@ public sealed class ChatMessage : INotifyPropertyChanged
     }
 
     public bool IsUser { get; }
+
+    public bool CanRegenerate
+    {
+        get => _canRegenerate;
+        set
+        {
+            if (_canRegenerate == value)
+            {
+                return;
+            }
+
+            _canRegenerate = value;
+            OnPropertyChanged();
+        }
+    }
 
     public bool IsStreaming
     {

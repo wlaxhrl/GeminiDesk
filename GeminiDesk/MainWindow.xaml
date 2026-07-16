@@ -83,6 +83,44 @@
             <Setter Property="Foreground" Value="#FF5D51C6" />
         </Style>
 
+        <Style x:Key="ResponseActionButton" TargetType="Button">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Margin" Value="0,0,3,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="ToolTipService.InitialShowDelay" Value="300" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ActionButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="9">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ActionButtonBorder" Property="Background" Value="{StaticResource PrimarySoftBrush}" />
+                                <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ActionButtonBorder" Property="Opacity" Value="0.65" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource PillButton}">
             <Setter Property="Background" Value="#FFFFF1F3" />
             <Setter Property="BorderThickness" Value="0" />
@@ -369,7 +407,12 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Grid Margin="4,6">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
                                             <Border x:Name="MessageBubble"
+                                                    Grid.Row="0"
                                                     MaxWidth="1300"
                                                     Padding="14,11"
                                                     HorizontalAlignment="Left"
@@ -507,6 +550,36 @@
                                                     </ItemsControl>
                                                 </StackPanel>
                                             </Border>
+
+                                            <StackPanel x:Name="ResponseActions"
+                                                        Grid.Row="1"
+                                                        Margin="10,3,0,0"
+                                                        HorizontalAlignment="Left"
+                                                        Orientation="Horizontal"
+                                                        Visibility="Collapsed">
+                                                <Button AutomationProperties.Name="응답 전체 복사"
+                                                        Click="CopyResponseButton_Click"
+                                                        Content="&#xE8C8;"
+                                                        Style="{StaticResource ResponseActionButton}"
+                                                        Tag="{Binding}"
+                                                        ToolTip="응답 전체 복사" />
+                                                <Button AutomationProperties.Name="답변 다시 생성"
+                                                        Click="RegenerateResponseButton_Click"
+                                                        Content="&#xE72C;"
+                                                        Tag="{Binding}"
+                                                        ToolTip="답변 다시 생성">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource ResponseActionButton}">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding CanRegenerate}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </StackPanel>
                                         </Grid>
                                         <DataTemplate.Triggers>
                                             <DataTrigger Binding="{Binding IsUser}" Value="True">
@@ -523,6 +596,13 @@
                                                 <Setter TargetName="MessageText" Property="Visibility" Value="Visible" />
                                                 <Setter TargetName="MarkdownMessage" Property="Visibility" Value="Collapsed" />
                                             </DataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsUser}" Value="False" />
+                                                    <Condition Binding="{Binding IsStreaming}" Value="False" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter TargetName="ResponseActions" Property="Visibility" Value="Visible" />
+                                            </MultiDataTrigger>
                                         </DataTemplate.Triggers>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

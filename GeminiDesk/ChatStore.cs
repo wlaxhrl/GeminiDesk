@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using Microsoft.Data.Sqlite;
 
@@ -139,6 +140,62 @@ public sealed class ChatStore
         updateCommand.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O"));
         updateCommand.Parameters.AddWithValue("$id", conversationId);
         updateCommand.ExecuteNonQuery();
+        transaction.Commit();
+    }
+
+    public void ReplaceLatestModelMessage(string conversationId, ChatMessage message)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using var selectCommand = connection.CreateCommand();
+        selectCommand.Transaction = transaction;
+        selectCommand.CommandText = """
+            SELECT Id
+            FROM Messages
+            WHERE ConversationId = $conversationId AND Role = 'model'
+            ORDER BY Id DESC
+            LIMIT 1;
+            """;
+        selectCommand.Parameters.AddWithValue("$conversationId", conversationId);
+        var messageIdValue = selectCommand.ExecuteScalar()
+            ?? throw new InvalidOperationException("다시 생성할 Gemini 응답을 찾지 못했습니다.");
+        var messageId = Convert.ToInt64(messageIdValue, CultureInfo.InvariantCulture);
+
+        using var updateMessageCommand = connection.CreateCommand();
+        updateMessageCommand.Transaction = transaction;
+        updateMessageCommand.CommandText = "UPDATE Messages SET Text = $text WHERE Id = $messageId;";
+        updateMessageCommand.Parameters.AddWithValue("$text", message.Text);
+        updateMessageCommand.Parameters.AddWithValue("$messageId", messageId);
+        updateMessageCommand.ExecuteNonQuery();
+
+        using var deleteSourcesCommand = connection.CreateCommand();
+        deleteSourcesCommand.Transaction = transaction;
+        deleteSourcesCommand.CommandText = "DELETE FROM Sources WHERE MessageId = $messageId;";
+        deleteSourcesCommand.Parameters.AddWithValue("$messageId", messageId);
+        deleteSourcesCommand.ExecuteNonQuery();
+
+        foreach (var source in message.Sources)
+        {
+            using var sourceCommand = connection.CreateCommand();
+            sourceCommand.Transaction = transaction;
+            sourceCommand.CommandText = """
+                INSERT INTO Sources (MessageId, Title, Uri)
+                VALUES ($messageId, $title, $uri);
+                """;
+            sourceCommand.Parameters.AddWithValue("$messageId", messageId);
+            sourceCommand.Parameters.AddWithValue("$title", source.Title);
+            sourceCommand.Parameters.AddWithValue("$uri", source.Uri);
+            sourceCommand.ExecuteNonQuery();
+        }
+
+        using var updateConversationCommand = connection.CreateCommand();
+        updateConversationCommand.Transaction = transaction;
+        updateConversationCommand.CommandText = """
+            UPDATE Conversations SET UpdatedAtUtc = $updatedAt WHERE Id = $id;
+            """;
+        updateConversationCommand.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O"));
+        updateConversationCommand.Parameters.AddWithValue("$id", conversationId);
+        updateConversationCommand.ExecuteNonQuery();
         transaction.Commit();
     }
 
