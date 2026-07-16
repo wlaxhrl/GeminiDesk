@@ -119,7 +119,7 @@ public static class ModelCatalogService
                 "3.1 Pro",
                 "✦",
                 "PREVIEW",
-                "복잡한 추론에 강한 Preview · Gemini API 무료 티어 없음",
+                "복잡한 추론에 강한 Preview",
                 true)
         ];
     }
