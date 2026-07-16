@@ -435,6 +435,39 @@
                                                              Foreground="{StaticResource InkBrush}"
                                                              Text="{Binding Text}"
                                                              TextWrapping="Wrap" />
+                                                    <StackPanel x:Name="EditMessagePanel" Visibility="Collapsed">
+                                                        <TextBox x:Name="EditMessageBox"
+                                                                 MinWidth="340"
+                                                                 MinHeight="86"
+                                                                 MaxHeight="260"
+                                                                 AcceptsReturn="True"
+                                                                 FontFamily="Segoe UI Variable Text, Malgun Gothic"
+                                                                 FontSize="15.5"
+                                                                 IsVisibleChanged="EditMessageBox_IsVisibleChanged"
+                                                                 Text="{Binding EditText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                 TextBlock.LineHeight="27"
+                                                                 TextBlock.LineStackingStrategy="BlockLineHeight"
+                                                                 TextWrapping="Wrap"
+                                                                 VerticalScrollBarVisibility="Auto"
+                                                                 Style="{StaticResource RoundedTextBox}" />
+                                                        <StackPanel Margin="0,10,0,0"
+                                                                    HorizontalAlignment="Right"
+                                                                    Orientation="Horizontal">
+                                                            <Button Height="32"
+                                                                    Margin="0,0,7,0"
+                                                                    Padding="13,4"
+                                                                    Click="CancelEditMessageButton_Click"
+                                                                    Content="취소"
+                                                                    Style="{StaticResource SoftButton}"
+                                                                    Tag="{Binding}" />
+                                                            <Button Height="32"
+                                                                    Padding="13,4"
+                                                                    Click="SaveEditMessageButton_Click"
+                                                                    Content="저장 후 다시 생성"
+                                                                    Style="{StaticResource PrimaryButton}"
+                                                                    Tag="{Binding}" />
+                                                        </StackPanel>
+                                                    </StackPanel>
                                                     <local:ReadableMarkdownViewer x:Name="MarkdownMessage"
                                                                                   Background="Transparent"
                                                                                   BorderThickness="0"
@@ -551,6 +584,36 @@
                                                 </StackPanel>
                                             </Border>
 
+                                            <StackPanel x:Name="UserActions"
+                                                        Grid.Row="1"
+                                                        Margin="0,3,10,0"
+                                                        HorizontalAlignment="Right"
+                                                        Orientation="Horizontal"
+                                                        Visibility="Collapsed">
+                                                <Button AutomationProperties.Name="내 메시지 복사"
+                                                        Click="CopyUserMessageButton_Click"
+                                                        Content="&#xE8C8;"
+                                                        Style="{StaticResource ResponseActionButton}"
+                                                        Tag="{Binding}"
+                                                        ToolTip="내 메시지 복사" />
+                                                <Button AutomationProperties.Name="내 메시지 편집"
+                                                        Click="EditUserMessageButton_Click"
+                                                        Content="&#xE70F;"
+                                                        Tag="{Binding}"
+                                                        ToolTip="내 메시지 편집">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource ResponseActionButton}">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding CanEdit}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </StackPanel>
+
                                             <StackPanel x:Name="ResponseActions"
                                                         Grid.Row="1"
                                                         Margin="10,3,0,0"
@@ -598,11 +661,27 @@
                                             </DataTrigger>
                                             <MultiDataTrigger>
                                                 <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsUser}" Value="True" />
+                                                    <Condition Binding="{Binding IsEditing}" Value="False" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter TargetName="UserActions" Property="Visibility" Value="Visible" />
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
                                                     <Condition Binding="{Binding IsUser}" Value="False" />
                                                     <Condition Binding="{Binding IsStreaming}" Value="False" />
                                                 </MultiDataTrigger.Conditions>
                                                 <Setter TargetName="ResponseActions" Property="Visibility" Value="Visible" />
                                             </MultiDataTrigger>
+                                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                <Setter TargetName="MessageBubble" Property="HorizontalAlignment" Value="Right" />
+                                                <Setter TargetName="MessageBubble" Property="Background" Value="#FFF5F3FF" />
+                                                <Setter TargetName="MessageBubble" Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
+                                                <Setter TargetName="MessageBubble" Property="BorderThickness" Value="1" />
+                                                <Setter TargetName="MessageText" Property="Visibility" Value="Collapsed" />
+                                                <Setter TargetName="EditMessagePanel" Property="Visibility" Value="Visible" />
+                                                <Setter TargetName="UserActions" Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
                                         </DataTemplate.Triggers>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

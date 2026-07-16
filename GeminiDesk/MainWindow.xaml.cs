@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -26,6 +27,7 @@ public partial class MainWindow : Window
     private readonly WindowsCredentialStore _apiKeyCredentialStore = new(ApiKeyCredentialTarget);
     private readonly ChatStore _chatStore;
     private CancellationTokenSource? _generationCancellation;
+    private ChatMessage? _editingUserMessage;
     private string? _currentConversationId;
     private bool _isUpdatingRememberApiKey;
     private bool _isUpdatingConversationSelection;
@@ -294,7 +296,7 @@ public partial class MainWindow : Window
         var modelMessage = new ChatMessage(string.Empty, false, [], []);
         modelMessage.IsStreaming = true;
         Messages.Add(modelMessage);
-        UpdateRegenerateAvailability();
+        UpdateMessageActionAvailability();
         PromptBox.Clear();
         ScrollToLatestMessage();
         _generationCancellation = new CancellationTokenSource();
@@ -423,7 +425,7 @@ public partial class MainWindow : Window
             _chatStore.SaveMessage(_currentConversationId, userMessage);
             _chatStore.SaveMessage(_currentConversationId, modelMessage);
             RefreshConversations();
-            UpdateRegenerateAvailability();
+            UpdateMessageActionAvailability();
             StatusText.Text = successStatus;
         }
         catch (Exception storageException)
@@ -551,6 +553,7 @@ public partial class MainWindow : Window
 
     private void StartNewChat()
     {
+        _editingUserMessage = null;
         _currentConversationId = null;
         _conversationHistory.Clear();
         Messages.Clear();
@@ -566,6 +569,7 @@ public partial class MainWindow : Window
     private void LoadConversation(string conversationId)
     {
         var storedMessages = _chatStore.GetMessages(conversationId);
+        _editingUserMessage = null;
         _currentConversationId = conversationId;
         Messages.Clear();
         _conversationHistory.Clear();
@@ -601,7 +605,7 @@ public partial class MainWindow : Window
             });
         }
 
-        UpdateRegenerateAvailability();
+        UpdateMessageActionAvailability();
         StatusText.Text = "저장된 대화를 불러왔습니다";
         ScrollToLatestMessage();
         PromptBox.Focus();
@@ -852,19 +856,355 @@ public partial class MainWindow : Window
             return;
         }
 
+        CopyMessageToClipboard(message, "Gemini 응답 전체를 복사했어요");
+    }
+
+    private void CopyUserMessageButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement element ||
+            element.Tag is not ChatMessage message ||
+            string.IsNullOrEmpty(message.Text))
+        {
+            return;
+        }
+
+        CopyMessageToClipboard(message, "내 메시지를 복사했어요");
+    }
+
+    private void CopyMessageToClipboard(ChatMessage message, string successStatus)
+    {
         try
         {
             Clipboard.SetText(message.Text);
-            StatusText.Text = "Gemini 응답 전체를 복사했어요";
+            StatusText.Text = successStatus;
         }
         catch (Exception exception)
         {
             MessageBox.Show(
-                $"응답을 클립보드에 복사하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                $"메시지를 클립보드에 복사하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
                 "복사 오류",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
+    }
+
+    private void EditUserMessageButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement element ||
+            element.Tag is not ChatMessage userMessage ||
+            !userMessage.CanEdit ||
+            Messages.Count < 2 ||
+            !ReferenceEquals(Messages[Messages.Count - 2], userMessage))
+        {
+            return;
+        }
+
+        if (_editingUserMessage is not null && !ReferenceEquals(_editingUserMessage, userMessage))
+        {
+            _editingUserMessage.IsEditing = false;
+        }
+
+        userMessage.EditText = GetEditableUserText(userMessage);
+        userMessage.IsEditing = true;
+        _editingUserMessage = userMessage;
+
+        if (Messages.LastOrDefault() is { IsUser: false } modelMessage)
+        {
+            modelMessage.CanRegenerate = false;
+        }
+
+        SetBusy(false);
+        StatusText.Text = "마지막 메시지를 편집하고 있어요";
+    }
+
+    private void EditMessageBox_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (sender is not TextBox textBox || !textBox.IsVisible)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            textBox.Focus();
+            textBox.CaretIndex = textBox.Text.Length;
+        });
+    }
+
+    private void CancelEditMessageButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement element || element.Tag is not ChatMessage userMessage)
+        {
+            return;
+        }
+
+        userMessage.EditText = GetEditableUserText(userMessage);
+        userMessage.IsEditing = false;
+
+        if (ReferenceEquals(_editingUserMessage, userMessage))
+        {
+            _editingUserMessage = null;
+        }
+
+        UpdateMessageActionAvailability();
+        SetBusy(false);
+        StatusText.Text = "메시지 편집을 취소했어요";
+        PromptBox.Focus();
+    }
+
+    private async void SaveEditMessageButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement element || element.Tag is not ChatMessage userMessage)
+        {
+            return;
+        }
+
+        await RegenerateAfterUserEditAsync(userMessage);
+    }
+
+    private async Task RegenerateAfterUserEditAsync(ChatMessage userMessage)
+    {
+        var modelMessage = Messages.LastOrDefault();
+
+        if (_generationCancellation is not null ||
+            !userMessage.CanEdit ||
+            !userMessage.IsEditing ||
+            Messages.Count < 2 ||
+            !ReferenceEquals(Messages[Messages.Count - 2], userMessage) ||
+            modelMessage is null ||
+            modelMessage.IsUser ||
+            modelMessage.IsStreaming ||
+            _currentConversationId is null ||
+            _conversationHistory.Count < 2 ||
+            !string.Equals(_conversationHistory[^2].Role, "user", StringComparison.Ordinal) ||
+            !string.Equals(_conversationHistory[^1].Role, "model", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var editedPrompt = userMessage.EditText.Trim();
+        if (string.IsNullOrWhiteSpace(editedPrompt))
+        {
+            MessageBox.Show(
+                "편집할 메시지 내용을 입력해 주세요.",
+                "내용 필요",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var apiKey = NormalizeApiKey(ApiKeyBox.Password);
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            MessageBox.Show(
+                "Gemini API 키를 입력해 주세요.",
+                "API 키 필요",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            ApiKeyBox.Focus();
+            return;
+        }
+
+        if (apiKey != ApiKeyBox.Password)
+        {
+            ApiKeyBox.Password = apiKey;
+        }
+
+        var originalUserText = userMessage.Text;
+        var originalModelText = modelMessage.Text;
+        var originalModelSources = modelMessage.Sources.ToList();
+        var originalUserContent = _conversationHistory[^2];
+        var originalModelContent = _conversationHistory[^1];
+        var historyPrefixCount = _conversationHistory.Count - 2;
+
+        var editedParts = new List<Part> { new() { Text = editedPrompt } };
+        if (originalUserContent.Parts is not null)
+        {
+            editedParts.AddRange(originalUserContent.Parts.Skip(1));
+        }
+
+        var editedUserContent = new Content
+        {
+            Role = "user",
+            Parts = editedParts
+        };
+
+        userMessage.Text = BuildUserMessageText(editedPrompt, userMessage.Attachments);
+        userMessage.IsEditing = false;
+        userMessage.CanEdit = false;
+        _editingUserMessage = null;
+
+        _conversationHistory.RemoveRange(historyPrefixCount, 2);
+        _conversationHistory.Add(editedUserContent);
+
+        modelMessage.CanRegenerate = false;
+        modelMessage.Text = string.Empty;
+        modelMessage.Sources = [];
+        modelMessage.IsStreaming = true;
+        _generationCancellation = new CancellationTokenSource();
+        SetBusy(true);
+        ScrollToLatestMessage();
+
+        try
+        {
+            var client = new Client(apiKey: apiKey);
+            var config = WebSearchCheckBox.IsChecked == true
+                ? new GenerateContentConfig
+                {
+                    Tools = [new Tool { GoogleSearch = new GoogleSearch() }]
+                }
+                : null;
+            var collectedSources = new List<ChatSource>();
+
+            await foreach (var chunk in client.Models.GenerateContentStreamAsync(
+                               model: ModelName,
+                               contents: _conversationHistory.ToList(),
+                               config: config,
+                               cancellationToken: _generationCancellation.Token))
+            {
+                var chunkText = string.Concat(chunk.Candidates?
+                    .SelectMany(candidate => candidate.Content?.Parts ?? [])
+                    .Select(part => part.Text)
+                    .Where(text => !string.IsNullOrEmpty(text)) ?? []);
+
+                if (!string.IsNullOrEmpty(chunkText))
+                {
+                    modelMessage.Text += chunkText;
+                    ScrollToLatestMessage();
+                }
+
+                collectedSources.AddRange(ExtractSources(chunk));
+            }
+
+            if (string.IsNullOrWhiteSpace(modelMessage.Text))
+            {
+                modelMessage.Text = "응답 내용이 없습니다.";
+            }
+
+            modelMessage.Sources = collectedSources
+                .DistinctBy(source => source.Uri)
+                .ToList();
+            modelMessage.IsStreaming = false;
+
+            _chatStore.ReplaceLatestExchange(_currentConversationId, userMessage, modelMessage);
+            _conversationHistory.Add(new Content
+            {
+                Role = "model",
+                Parts = [new Part { Text = modelMessage.Text }]
+            });
+            userMessage.EditText = editedPrompt;
+            SaveRememberedApiKey(showConfirmation: false);
+            UpdateMessageActionAvailability();
+
+            try
+            {
+                RefreshConversations();
+                StatusText.Text = "메시지를 고치고 Gemini 답변도 다시 만들었어요 · 저장됨";
+            }
+            catch
+            {
+                StatusText.Text = "편집한 대화는 저장됨 · 대화 목록 새로고침 실패";
+            }
+        }
+        catch (OperationCanceledException) when (_generationCancellation.IsCancellationRequested)
+        {
+            RestoreExchangeBeforeEdit(
+                userMessage,
+                modelMessage,
+                originalUserText,
+                editedPrompt,
+                originalModelText,
+                originalModelSources,
+                originalUserContent,
+                originalModelContent,
+                historyPrefixCount);
+            StatusText.Text = "답변 생성을 중지했어요 · 편집 내용을 다시 확인해 주세요";
+        }
+        catch (Exception exception)
+        {
+            RestoreExchangeBeforeEdit(
+                userMessage,
+                modelMessage,
+                originalUserText,
+                editedPrompt,
+                originalModelText,
+                originalModelSources,
+                originalUserContent,
+                originalModelContent,
+                historyPrefixCount);
+            StatusText.Text = "메시지 편집 후 답변 생성 실패";
+            MessageBox.Show(
+                $"편집한 메시지로 답변을 다시 생성하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                "다시 생성 오류",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _generationCancellation?.Dispose();
+            _generationCancellation = null;
+            SetBusy(false);
+            ScrollToLatestMessage();
+
+            if (!userMessage.IsEditing)
+            {
+                PromptBox.Focus();
+            }
+        }
+    }
+
+    private void RestoreExchangeBeforeEdit(
+        ChatMessage userMessage,
+        ChatMessage modelMessage,
+        string originalUserText,
+        string editedPrompt,
+        string originalModelText,
+        IReadOnlyList<ChatSource> originalModelSources,
+        Content originalUserContent,
+        Content originalModelContent,
+        int historyPrefixCount)
+    {
+        if (_conversationHistory.Count > historyPrefixCount)
+        {
+            _conversationHistory.RemoveRange(
+                historyPrefixCount,
+                _conversationHistory.Count - historyPrefixCount);
+        }
+
+        _conversationHistory.Add(originalUserContent);
+        _conversationHistory.Add(originalModelContent);
+
+        userMessage.Text = originalUserText;
+        userMessage.EditText = editedPrompt;
+        userMessage.IsEditing = true;
+        _editingUserMessage = userMessage;
+
+        modelMessage.Text = originalModelText;
+        modelMessage.Sources = originalModelSources;
+        modelMessage.IsStreaming = false;
+        UpdateMessageActionAvailability();
+    }
+
+    private static string GetEditableUserText(ChatMessage message)
+    {
+        if (message.Attachments.Count == 0)
+        {
+            return message.Text;
+        }
+
+        var attachmentSummary = $"{System.Environment.NewLine}{System.Environment.NewLine}첨부: {string.Join(", ", message.Attachments.Select(item => item.Name))}";
+        return message.Text.EndsWith(attachmentSummary, StringComparison.Ordinal)
+            ? message.Text[..^attachmentSummary.Length]
+            : message.Text;
+    }
+
+    private static string BuildUserMessageText(
+        string prompt,
+        IReadOnlyList<ChatAttachment> attachments)
+    {
+        return attachments.Count == 0
+            ? prompt
+            : $"{prompt}{System.Environment.NewLine}{System.Environment.NewLine}첨부: {string.Join(", ", attachments.Select(item => item.Name))}";
     }
 
     private async void RegenerateResponseButton_Click(object sender, RoutedEventArgs e)
@@ -967,7 +1307,7 @@ public partial class MainWindow : Window
                 Parts = [new Part { Text = modelMessage.Text }]
             });
             SaveRememberedApiKey(showConfirmation: false);
-            UpdateRegenerateAvailability();
+            UpdateMessageActionAvailability();
 
             try
             {
@@ -1014,37 +1354,56 @@ public partial class MainWindow : Window
         modelMessage.Sources = originalSources;
         modelMessage.IsStreaming = false;
         _conversationHistory.Add(originalContent);
-        UpdateRegenerateAvailability();
+        UpdateMessageActionAvailability();
     }
 
-    private void UpdateRegenerateAvailability()
+    private void UpdateMessageActionAvailability()
     {
-        foreach (var message in Messages.Where(message => !message.IsUser))
+        foreach (var message in Messages)
         {
-            message.CanRegenerate = false;
+            if (message.IsUser)
+            {
+                message.CanEdit = false;
+            }
+            else
+            {
+                message.CanRegenerate = false;
+            }
         }
 
         if (Messages.LastOrDefault() is { IsUser: false, IsStreaming: false } lastMessage &&
             _currentConversationId is not null &&
             _conversationHistory.LastOrDefault() is { Role: "model" })
         {
-            lastMessage.CanRegenerate = true;
+            if (_editingUserMessage is null)
+            {
+                lastMessage.CanRegenerate = true;
+            }
+
+            if (Messages.Count >= 2 &&
+                Messages[Messages.Count - 2] is { IsUser: true } lastUserMessage &&
+                _conversationHistory.Count >= 2 &&
+                string.Equals(_conversationHistory[^2].Role, "user", StringComparison.Ordinal))
+            {
+                lastUserMessage.CanEdit = true;
+            }
         }
     }
 
     private void SetBusy(bool isBusy)
     {
-        SendButton.IsEnabled = true;
+        var isEditing = _editingUserMessage?.IsEditing == true;
+        SendButton.IsEnabled = isBusy || !isEditing;
         SendButton.Content = isBusy ? "중지" : "보내기";
-        NewChatButton.IsEnabled = !isBusy;
-        ConversationList.IsEnabled = !isBusy;
-        DeleteChatButton.IsEnabled = !isBusy;
-        AttachButton.IsEnabled = !isBusy;
-        ClearAttachmentsButton.IsEnabled = !isBusy && _attachments.Count > 0;
+        NewChatButton.IsEnabled = !isBusy && !isEditing;
+        ConversationList.IsEnabled = !isBusy && !isEditing;
+        DeleteChatButton.IsEnabled = !isBusy && !isEditing;
+        AttachButton.IsEnabled = !isBusy && !isEditing;
+        ClearAttachmentsButton.IsEnabled = !isBusy && !isEditing && _attachments.Count > 0;
         WebSearchCheckBox.IsEnabled = !isBusy;
         ApiKeyBox.IsEnabled = !isBusy;
         RememberApiKeyCheckBox.IsEnabled = !isBusy;
-        PromptBox.IsEnabled = !isBusy;
+        PromptBox.IsEnabled = !isBusy && !isEditing;
 
         if (isBusy)
         {
@@ -1068,8 +1427,11 @@ public partial class MainWindow : Window
 public sealed class ChatMessage : INotifyPropertyChanged
 {
     private string _text;
+    private string _editText;
     private IReadOnlyList<ChatSource> _sources;
+    private bool _canEdit;
     private bool _canRegenerate;
+    private bool _isEditing;
     private bool _isStreaming;
 
     public ChatMessage(
@@ -1079,6 +1441,7 @@ public sealed class ChatMessage : INotifyPropertyChanged
         IReadOnlyList<ChatAttachment> attachments)
     {
         _text = text;
+        _editText = text;
         IsUser = isUser;
         _sources = sources;
         Attachments = attachments;
@@ -1100,6 +1463,36 @@ public sealed class ChatMessage : INotifyPropertyChanged
     }
 
     public bool IsUser { get; }
+
+    public string EditText
+    {
+        get => _editText;
+        set
+        {
+            if (_editText == value)
+            {
+                return;
+            }
+
+            _editText = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool CanEdit
+    {
+        get => _canEdit;
+        set
+        {
+            if (_canEdit == value)
+            {
+                return;
+            }
+
+            _canEdit = value;
+            OnPropertyChanged();
+        }
+    }
 
     public bool CanRegenerate
     {
@@ -1127,6 +1520,21 @@ public sealed class ChatMessage : INotifyPropertyChanged
             }
 
             _isStreaming = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool IsEditing
+    {
+        get => _isEditing;
+        set
+        {
+            if (_isEditing == value)
+            {
+                return;
+            }
+
+            _isEditing = value;
             OnPropertyChanged();
         }
     }

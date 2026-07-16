@@ -199,6 +199,88 @@ public sealed class ChatStore
         transaction.Commit();
     }
 
+    public void ReplaceLatestExchange(
+        string conversationId,
+        ChatMessage userMessage,
+        ChatMessage modelMessage)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+
+        using var selectModelCommand = connection.CreateCommand();
+        selectModelCommand.Transaction = transaction;
+        selectModelCommand.CommandText = """
+            SELECT Id
+            FROM Messages
+            WHERE ConversationId = $conversationId AND Role = 'model'
+            ORDER BY Id DESC
+            LIMIT 1;
+            """;
+        selectModelCommand.Parameters.AddWithValue("$conversationId", conversationId);
+        var modelMessageIdValue = selectModelCommand.ExecuteScalar()
+            ?? throw new InvalidOperationException("편집할 메시지의 Gemini 응답을 찾지 못했습니다.");
+        var modelMessageId = Convert.ToInt64(modelMessageIdValue, CultureInfo.InvariantCulture);
+
+        using var selectUserCommand = connection.CreateCommand();
+        selectUserCommand.Transaction = transaction;
+        selectUserCommand.CommandText = """
+            SELECT Id
+            FROM Messages
+            WHERE ConversationId = $conversationId AND Role = 'user' AND Id < $modelMessageId
+            ORDER BY Id DESC
+            LIMIT 1;
+            """;
+        selectUserCommand.Parameters.AddWithValue("$conversationId", conversationId);
+        selectUserCommand.Parameters.AddWithValue("$modelMessageId", modelMessageId);
+        var userMessageIdValue = selectUserCommand.ExecuteScalar()
+            ?? throw new InvalidOperationException("편집할 사용자 메시지를 찾지 못했습니다.");
+        var userMessageId = Convert.ToInt64(userMessageIdValue, CultureInfo.InvariantCulture);
+
+        using var updateUserCommand = connection.CreateCommand();
+        updateUserCommand.Transaction = transaction;
+        updateUserCommand.CommandText = "UPDATE Messages SET Text = $text WHERE Id = $messageId;";
+        updateUserCommand.Parameters.AddWithValue("$text", userMessage.Text);
+        updateUserCommand.Parameters.AddWithValue("$messageId", userMessageId);
+        updateUserCommand.ExecuteNonQuery();
+
+        using var updateModelCommand = connection.CreateCommand();
+        updateModelCommand.Transaction = transaction;
+        updateModelCommand.CommandText = "UPDATE Messages SET Text = $text WHERE Id = $messageId;";
+        updateModelCommand.Parameters.AddWithValue("$text", modelMessage.Text);
+        updateModelCommand.Parameters.AddWithValue("$messageId", modelMessageId);
+        updateModelCommand.ExecuteNonQuery();
+
+        using var deleteSourcesCommand = connection.CreateCommand();
+        deleteSourcesCommand.Transaction = transaction;
+        deleteSourcesCommand.CommandText = "DELETE FROM Sources WHERE MessageId = $messageId;";
+        deleteSourcesCommand.Parameters.AddWithValue("$messageId", modelMessageId);
+        deleteSourcesCommand.ExecuteNonQuery();
+
+        foreach (var source in modelMessage.Sources)
+        {
+            using var sourceCommand = connection.CreateCommand();
+            sourceCommand.Transaction = transaction;
+            sourceCommand.CommandText = """
+                INSERT INTO Sources (MessageId, Title, Uri)
+                VALUES ($messageId, $title, $uri);
+                """;
+            sourceCommand.Parameters.AddWithValue("$messageId", modelMessageId);
+            sourceCommand.Parameters.AddWithValue("$title", source.Title);
+            sourceCommand.Parameters.AddWithValue("$uri", source.Uri);
+            sourceCommand.ExecuteNonQuery();
+        }
+
+        using var updateConversationCommand = connection.CreateCommand();
+        updateConversationCommand.Transaction = transaction;
+        updateConversationCommand.CommandText = """
+            UPDATE Conversations SET UpdatedAtUtc = $updatedAt WHERE Id = $id;
+            """;
+        updateConversationCommand.Parameters.AddWithValue("$updatedAt", DateTime.UtcNow.ToString("O"));
+        updateConversationCommand.Parameters.AddWithValue("$id", conversationId);
+        updateConversationCommand.ExecuteNonQuery();
+        transaction.Commit();
+    }
+
     public IReadOnlyList<ChatMessage> GetMessages(string conversationId)
     {
         using var connection = OpenConnection();
