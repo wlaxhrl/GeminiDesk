@@ -5,17 +5,28 @@ using System.Text.Json;
 
 namespace GeminiDesk;
 
-public sealed record GeminiModelOption(
-    string Id,
-    string DisplayName,
-    string ShortName,
-    string Icon,
-    string? Badge,
-    string Description,
-    bool RequiresBilling);
+public static class ModelProvider
+{
+    public const string Google = "google";
+    public const string OpenAi = "openai";
+}
+
+public sealed record AiModelOption
+{
+    public string Id { get; init; } = string.Empty;
+    public string Provider { get; init; } = ModelProvider.Google;
+    public string DisplayName { get; init; } = string.Empty;
+    public string ShortName { get; init; } = string.Empty;
+    public string Icon { get; init; } = string.Empty;
+    public string? Badge { get; init; }
+    public string Description { get; init; } = string.Empty;
+    public bool RequiresBilling { get; init; }
+    public string? ReasoningEffort { get; init; }
+}
 
 public static class ModelCatalogService
 {
+    private const int CurrentSchemaVersion = 2;
     private const string RemoteCatalogUrl =
         "https://raw.githubusercontent.com/wlaxhrl/GeminiDesk/main/models.json";
 
@@ -26,14 +37,21 @@ public static class ModelCatalogService
 
     private static readonly HttpClient HttpClient = CreateHttpClient();
 
-    public static IReadOnlyList<GeminiModelOption> LoadInitialCatalog()
+    public static IReadOnlyList<AiModelOption> LoadInitialCatalog()
     {
-        return TryLoadCatalog(CachePath)
-            ?? TryLoadCatalog(Path.Combine(AppContext.BaseDirectory, "models.json"))
-            ?? CreateEmergencyCatalog();
+        var cachedCatalog = TryLoadCatalog(CachePath);
+        var bundledCatalog = TryLoadCatalog(Path.Combine(AppContext.BaseDirectory, "models.json"));
+
+        if (cachedCatalog is not null &&
+            (bundledCatalog is null || cachedCatalog.SchemaVersion >= bundledCatalog.SchemaVersion))
+        {
+            return cachedCatalog.Models;
+        }
+
+        return bundledCatalog?.Models ?? CreateEmergencyCatalog();
     }
 
-    public static async Task<IReadOnlyList<GeminiModelOption>?> TryRefreshCatalogAsync(
+    public static async Task<IReadOnlyList<AiModelOption>?> TryRefreshCatalogAsync(
         CancellationToken cancellationToken = default)
     {
         try
@@ -43,16 +61,16 @@ public static class ModelCatalogService
             using var response = await HttpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var models = ParseCatalog(json);
+            var catalog = ParseCatalog(json);
 
-            if (models is null)
+            if (catalog is null || catalog.SchemaVersion < CurrentSchemaVersion)
             {
                 return null;
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(CachePath)!);
             await File.WriteAllTextAsync(CachePath, json, cancellationToken);
-            return models;
+            return catalog.Models;
         }
         catch
         {
@@ -60,7 +78,7 @@ public static class ModelCatalogService
         }
     }
 
-    private static IReadOnlyList<GeminiModelOption>? TryLoadCatalog(string path)
+    private static ParsedModelCatalog? TryLoadCatalog(string path)
     {
         try
         {
@@ -74,10 +92,10 @@ public static class ModelCatalogService
         }
     }
 
-    private static IReadOnlyList<GeminiModelOption>? ParseCatalog(string json)
+    private static ParsedModelCatalog? ParseCatalog(string json)
     {
         var catalog = JsonSerializer.Deserialize<ModelCatalogDocument>(json, JsonOptions);
-        if (catalog is null || catalog.SchemaVersion != 1 || catalog.Models is null)
+        if (catalog is null || catalog.SchemaVersion is < 1 or > 2 || catalog.Models is null)
         {
             return null;
         }
@@ -87,10 +105,12 @@ public static class ModelCatalogService
             .DistinctBy(model => model.Id, StringComparer.Ordinal)
             .ToList();
 
-        return models.Count > 0 ? models : null;
+        return models.Count > 0
+            ? new ParsedModelCatalog(catalog.SchemaVersion, models)
+            : null;
     }
 
-    private static bool IsValidModel(GeminiModelOption model)
+    private static bool IsValidModel(AiModelOption model)
     {
         return !string.IsNullOrWhiteSpace(model.Id) &&
                model.Id.Length <= 100 &&
@@ -98,29 +118,70 @@ public static class ModelCatalogService
                !string.IsNullOrWhiteSpace(model.DisplayName) &&
                !string.IsNullOrWhiteSpace(model.ShortName) &&
                !string.IsNullOrWhiteSpace(model.Icon) &&
-               !string.IsNullOrWhiteSpace(model.Description);
+               !string.IsNullOrWhiteSpace(model.Description) &&
+               model.Provider is ModelProvider.Google or ModelProvider.OpenAi &&
+               (model.ReasoningEffort is null or "none" or "low" or "medium" or "high" or "xhigh" or "max");
     }
 
-    private static IReadOnlyList<GeminiModelOption> CreateEmergencyCatalog()
+    private static IReadOnlyList<AiModelOption> CreateEmergencyCatalog()
     {
         return
         [
-            new GeminiModelOption(
-                "gemini-3.5-flash",
-                "Gemini 3.5 Flash",
-                "3.5 Flash",
-                "⚡",
-                "STABLE",
-                "빠르고 균형 잡힌 안정 버전",
-                false),
-            new GeminiModelOption(
-                "gemini-3.1-pro-preview",
-                "Gemini 3.1 Pro Preview",
-                "3.1 Pro",
-                "✦",
-                "PREVIEW",
-                "복잡한 추론에 강한 Preview",
-                true)
+            new()
+            {
+                Id = "gemini-3.5-flash",
+                Provider = ModelProvider.Google,
+                DisplayName = "Gemini 3.5 Flash",
+                ShortName = "3.5 Flash",
+                Icon = "⚡",
+                Badge = "STABLE",
+                Description = "빠르고 균형 잡힌 안정 버전"
+            },
+            new()
+            {
+                Id = "gemini-3.1-pro-preview",
+                Provider = ModelProvider.Google,
+                DisplayName = "Gemini 3.1 Pro Preview",
+                ShortName = "3.1 Pro",
+                Icon = "✦",
+                Badge = "PREVIEW",
+                Description = "복잡한 추론에 강한 Preview",
+                RequiresBilling = true
+            },
+            new()
+            {
+                Id = "gpt-5.6-luna",
+                Provider = ModelProvider.OpenAi,
+                DisplayName = "GPT-5.6 Luna",
+                ShortName = "5.6 Luna",
+                Icon = "☾",
+                Badge = "VALUE",
+                Description = "가볍고 경제적인 일상 작업용 GPT",
+                RequiresBilling = true
+            },
+            new()
+            {
+                Id = "gpt-5.6-terra",
+                Provider = ModelProvider.OpenAi,
+                DisplayName = "GPT-5.6 Terra",
+                ShortName = "5.6 Terra",
+                Icon = "◇",
+                Badge = "BALANCED",
+                Description = "성능과 비용의 균형이 좋은 GPT",
+                RequiresBilling = true
+            },
+            new()
+            {
+                Id = "gpt-5.6-sol",
+                Provider = ModelProvider.OpenAi,
+                DisplayName = "GPT-5.6 Sol",
+                ShortName = "5.6 Sol",
+                Icon = "☀",
+                Badge = "MAX",
+                Description = "가장 어려운 작업용 · 추론 강도 최대",
+                RequiresBilling = true,
+                ReasoningEffort = "max"
+            }
         ];
     }
 
@@ -138,5 +199,9 @@ public static class ModelCatalogService
 
     private sealed record ModelCatalogDocument(
         int SchemaVersion,
-        IReadOnlyList<GeminiModelOption>? Models);
+        IReadOnlyList<AiModelOption>? Models);
+
+    private sealed record ParsedModelCatalog(
+        int SchemaVersion,
+        IReadOnlyList<AiModelOption> Models);
 }

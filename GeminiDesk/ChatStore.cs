@@ -182,7 +182,7 @@ public sealed class ChatStore
             """;
         selectCommand.Parameters.AddWithValue("$conversationId", conversationId);
         var messageIdValue = selectCommand.ExecuteScalar()
-            ?? throw new InvalidOperationException("다시 생성할 Gemini 응답을 찾지 못했습니다.");
+            ?? throw new InvalidOperationException("다시 생성할 AI 응답을 찾지 못했습니다.");
         var messageId = Convert.ToInt64(messageIdValue, CultureInfo.InvariantCulture);
 
         using var updateMessageCommand = connection.CreateCommand();
@@ -247,7 +247,7 @@ public sealed class ChatStore
             """;
         selectModelCommand.Parameters.AddWithValue("$conversationId", conversationId);
         var modelMessageIdValue = selectModelCommand.ExecuteScalar()
-            ?? throw new InvalidOperationException("편집할 메시지의 Gemini 응답을 찾지 못했습니다.");
+            ?? throw new InvalidOperationException("편집할 메시지의 AI 응답을 찾지 못했습니다.");
         var modelMessageId = Convert.ToInt64(modelMessageIdValue, CultureInfo.InvariantCulture);
 
         using var selectUserCommand = connection.CreateCommand();

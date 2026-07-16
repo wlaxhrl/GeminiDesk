@@ -355,7 +355,7 @@
                                Foreground="{StaticResource MutedBrush}"
                                Text="사용할 모델" />
                     <Button x:Name="ModelMenuButton"
-                            AutomationProperties.Name="사용할 Gemini 모델 선택"
+                            AutomationProperties.Name="사용할 AI 모델 선택"
                             Click="ModelMenuButton_Click"
                             Style="{StaticResource ModelPickerButton}">
                         <StackPanel Orientation="Horizontal">
@@ -431,10 +431,30 @@
                             BorderBrush="{StaticResource BorderBrush}"
                             BorderThickness="1"
                             CornerRadius="13">
-                        <PasswordBox x:Name="ApiKeyBox"
-                                     Style="{StaticResource RoundedPasswordBox}"
-                                     VerticalContentAlignment="Center"
-                                     LostKeyboardFocus="ApiKeyBox_LostKeyboardFocus" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Margin="7,6,4,6"
+                                    Padding="8,0"
+                                    VerticalAlignment="Stretch"
+                                    Background="{StaticResource PinkSoftBrush}"
+                                    CornerRadius="7">
+                                <TextBlock x:Name="ApiKeyProviderLabel"
+                                           VerticalAlignment="Center"
+                                           FontSize="10"
+                                           FontWeight="SemiBold"
+                                           Foreground="#FF9D5E7A"
+                                           Text="Gemini API 키" />
+                            </Border>
+                            <PasswordBox x:Name="ApiKeyBox"
+                                         Grid.Column="1"
+                                         AutomationProperties.Name="Gemini API 키"
+                                         Style="{StaticResource RoundedPasswordBox}"
+                                         VerticalContentAlignment="Center"
+                                         LostKeyboardFocus="ApiKeyBox_LostKeyboardFocus" />
+                        </Grid>
                     </Border>
                     <CheckBox x:Name="RememberApiKeyCheckBox"
                               Grid.Column="2"

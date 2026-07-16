@@ -1,8 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "models": [
     {
       "id": "gemini-3.5-flash",
+      "provider": "google",
       "displayName": "Gemini 3.5 Flash",
       "shortName": "3.5 Flash",
       "icon": "⚡",
@@ -12,12 +13,44 @@
     },
     {
       "id": "gemini-3.1-pro-preview",
+      "provider": "google",
       "displayName": "Gemini 3.1 Pro Preview",
       "shortName": "3.1 Pro",
       "icon": "✦",
       "badge": "PREVIEW",
       "description": "복잡한 추론에 강한 Preview",
       "requiresBilling": true
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "provider": "openai",
+      "displayName": "GPT-5.6 Luna",
+      "shortName": "5.6 Luna",
+      "icon": "☾",
+      "badge": "VALUE",
+      "description": "가볍고 경제적인 일상 작업용 GPT",
+      "requiresBilling": true
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "provider": "openai",
+      "displayName": "GPT-5.6 Terra",
+      "shortName": "5.6 Terra",
+      "icon": "◇",
+      "badge": "BALANCED",
+      "description": "성능과 비용의 균형이 좋은 GPT",
+      "requiresBilling": true
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "provider": "openai",
+      "displayName": "GPT-5.6 Sol",
+      "shortName": "5.6 Sol",
+      "icon": "☀",
+      "badge": "MAX",
+      "description": "가장 어려운 작업용 · 추론 강도 최대",
+      "requiresBilling": true,
+      "reasoningEffort": "max"
     }
   ]
 }

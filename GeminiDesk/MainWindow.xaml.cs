@@ -21,21 +21,31 @@ namespace GeminiDesk;
 
 public partial class MainWindow : Window
 {
-    private const string ApiKeyCredentialTarget = "GeminiDesk:GoogleGeminiApiKey";
+    private const string GoogleApiKeyCredentialTarget = "GeminiDesk:GoogleGeminiApiKey";
+    private const string OpenAiApiKeyCredentialTarget = "GeminiDesk:OpenAIApiKey";
     private const string DefaultModelId = "gemini-3.5-flash";
     private const string SelectedModelSettingKey = "selected-model";
     private const long MaxFileSize = 10 * 1024 * 1024;
     private const long MaxTotalAttachmentSize = 20 * 1024 * 1024;
     private readonly List<Content> _conversationHistory = [];
     private readonly List<AttachmentItem> _attachments = [];
-    private readonly List<GeminiModelOption> _modelOptions = [];
-    private readonly WindowsCredentialStore _apiKeyCredentialStore = new(ApiKeyCredentialTarget);
+    private readonly List<AiModelOption> _modelOptions = [];
+    private readonly Dictionary<string, WindowsCredentialStore> _apiKeyCredentialStores = new()
+    {
+        [ModelProvider.Google] = new WindowsCredentialStore(GoogleApiKeyCredentialTarget),
+        [ModelProvider.OpenAi] = new WindowsCredentialStore(OpenAiApiKeyCredentialTarget)
+    };
+    private readonly Dictionary<string, string> _apiKeys = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _rememberedApiKeyProviders = new(StringComparer.Ordinal);
+    private readonly OpenAiResponsesService _openAiResponsesService = new();
     private readonly AppUpdateService _appUpdateService = new();
     private readonly ChatStore _chatStore;
     private CancellationTokenSource? _generationCancellation;
     private UpdateInfo? _availableUpdate;
     private ChatMessage? _editingUserMessage;
     private string? _currentConversationId;
+    private string _activeApiKeyProvider = ModelProvider.Google;
+    private bool _isApiKeyUiInitialized;
     private string _selectedModelId = DefaultModelId;
     private bool _isUpdatingRememberApiKey;
     private bool _isUpdatingConversationSelection;
@@ -57,7 +67,7 @@ public partial class MainWindow : Window
             UpdateButton.ToolTip = "Setup 또는 포터블 배포판에서 자동 업데이트가 작동해요";
         }
 
-        LoadRememberedApiKey();
+        LoadRememberedApiKeys();
         _chatStore = new ChatStore();
         _modelOptions.AddRange(ModelCatalogService.LoadInitialCatalog());
         LoadSelectedModel();
@@ -127,8 +137,33 @@ public partial class MainWindow : Window
         };
         menu.HorizontalOffset = ModelMenuButton.ActualWidth - menuWidth;
 
+        string? currentProvider = null;
+
         foreach (var model in _modelOptions)
         {
+            if (!string.Equals(currentProvider, model.Provider, StringComparison.Ordinal))
+            {
+                if (currentProvider is not null)
+                {
+                    menu.Items.Add(new Separator());
+                }
+
+                var providerHeader = new MenuItem
+                {
+                    Header = new TextBlock
+                    {
+                        Text = model.Provider == ModelProvider.OpenAi ? "OPENAI GPT" : "GOOGLE GEMINI",
+                        FontSize = 9,
+                        FontWeight = FontWeights.Bold,
+                        Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush")
+                    },
+                    IsEnabled = false,
+                    Padding = new Thickness(10, 5, 10, 3)
+                };
+                menu.Items.Add(providerHeader);
+                currentProvider = model.Provider;
+            }
+
             var item = new MenuItem
             {
                 Header = CreateModelMenuHeader(model),
@@ -147,7 +182,7 @@ public partial class MainWindow : Window
         menu.IsOpen = true;
     }
 
-    private FrameworkElement CreateModelMenuHeader(GeminiModelOption model)
+    private FrameworkElement CreateModelMenuHeader(AiModelOption model)
     {
         var title = new StackPanel { Orientation = Orientation.Horizontal };
         title.Children.Add(new TextBlock
@@ -200,7 +235,7 @@ public partial class MainWindow : Window
 
     private void ModelMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem { Tag: GeminiModelOption model })
+        if (sender is not MenuItem { Tag: AiModelOption model })
         {
             return;
         }
@@ -208,8 +243,9 @@ public partial class MainWindow : Window
         SelectModel(model, persist: true, showStatus: true);
     }
 
-    private void SelectModel(GeminiModelOption model, bool persist, bool showStatus)
+    private void SelectModel(AiModelOption model, bool persist, bool showStatus)
     {
+        SwitchApiKeyProvider(model.Provider);
         _selectedModelId = model.Id;
         SelectedModelIcon.Text = model.Icon;
         SelectedModelName.Text = model.ShortName;
@@ -373,29 +409,76 @@ public partial class MainWindow : Window
         }
     }
 
-    private void LoadRememberedApiKey()
+    private void LoadRememberedApiKeys()
     {
-        try
-        {
-            if (!_apiKeyCredentialStore.TryRead(out var apiKey))
-            {
-                return;
-            }
+        var failedProviders = new List<string>();
 
-            ApiKeyBox.Password = NormalizeApiKey(apiKey);
-            SetRememberApiKeyChecked(true);
-            StatusText.Text = "저장된 API 키를 불러왔어요";
-        }
-        catch (Exception exception)
+        foreach (var (provider, credentialStore) in _apiKeyCredentialStores)
         {
-            SetRememberApiKeyChecked(false);
-            StatusText.Text = "저장된 API 키를 불러오지 못했어요";
+            try
+            {
+                if (!credentialStore.TryRead(out var apiKey))
+                {
+                    continue;
+                }
+
+                apiKey = NormalizeApiKey(apiKey);
+                if (string.IsNullOrWhiteSpace(apiKey))
+                {
+                    continue;
+                }
+
+                _apiKeys[provider] = apiKey;
+                _rememberedApiKeyProviders.Add(provider);
+            }
+            catch
+            {
+                failedProviders.Add(GetProviderDisplayName(provider));
+            }
+        }
+
+        if (failedProviders.Count > 0)
+        {
+            StatusText.Text = "일부 저장된 API 키를 불러오지 못했어요";
             MessageBox.Show(
-                $"Windows에 저장된 API 키를 불러오지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                $"Windows에서 {string.Join(", ", failedProviders)} API 키를 불러오지 못했습니다.",
                 "API 키 불러오기 오류",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
+    }
+
+    private void SwitchApiKeyProvider(string provider)
+    {
+        if (_isApiKeyUiInitialized)
+        {
+            CaptureActiveApiKey();
+
+            if (RememberApiKeyCheckBox.IsChecked == true)
+            {
+                SaveRememberedApiKey(showConfirmation: false);
+            }
+        }
+
+        _activeApiKeyProvider = provider;
+        var providerName = GetProviderDisplayName(provider);
+        ApiKeyProviderLabel.Text = $"{providerName} API 키";
+        AutomationProperties.SetName(ApiKeyBox, $"{providerName} API 키");
+        ApiKeyBox.Password = _apiKeys.GetValueOrDefault(provider, string.Empty);
+        SetRememberApiKeyChecked(_rememberedApiKeyProviders.Contains(provider));
+        _isApiKeyUiInitialized = true;
+    }
+
+    private void CaptureActiveApiKey()
+    {
+        var apiKey = NormalizeApiKey(ApiKeyBox.Password);
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            _apiKeys.Remove(_activeApiKeyProvider);
+            return;
+        }
+
+        _apiKeys[_activeApiKeyProvider] = apiKey;
     }
 
     private void RememberApiKeyCheckBox_Checked(object sender, RoutedEventArgs e)
@@ -417,8 +500,9 @@ public partial class MainWindow : Window
 
         try
         {
-            _apiKeyCredentialStore.Delete();
-            StatusText.Text = "API 키 저장을 해제했어요";
+            _apiKeyCredentialStores[_activeApiKeyProvider].Delete();
+            _rememberedApiKeyProviders.Remove(_activeApiKeyProvider);
+            StatusText.Text = $"{GetProviderDisplayName(_activeApiKeyProvider)} API 키 저장을 해제했어요";
         }
         catch (Exception exception)
         {
@@ -460,11 +544,13 @@ public partial class MainWindow : Window
         try
         {
             ApiKeyBox.Password = apiKey;
-            _apiKeyCredentialStore.Write(apiKey);
+            _apiKeys[_activeApiKeyProvider] = apiKey;
+            _apiKeyCredentialStores[_activeApiKeyProvider].Write(apiKey);
+            _rememberedApiKeyProviders.Add(_activeApiKeyProvider);
 
             if (showConfirmation)
             {
-                StatusText.Text = "API 키를 Windows에 안전하게 저장했어요";
+                StatusText.Text = $"{GetProviderDisplayName(_activeApiKeyProvider)} API 키를 Windows에 안전하게 저장했어요";
             }
 
             return true;
@@ -473,7 +559,7 @@ public partial class MainWindow : Window
         {
             try
             {
-                _apiKeyCredentialStore.Delete();
+                _apiKeyCredentialStores[_activeApiKeyProvider].Delete();
             }
             catch
             {
@@ -481,6 +567,7 @@ public partial class MainWindow : Window
             }
 
             SetRememberApiKeyChecked(false);
+            _rememberedApiKeyProviders.Remove(_activeApiKeyProvider);
             MessageBox.Show(
                 $"API 키를 Windows에 저장하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
                 "API 키 저장 오류",
@@ -488,6 +575,11 @@ public partial class MainWindow : Window
                 MessageBoxImage.Warning);
             return false;
         }
+    }
+
+    private static string GetProviderDisplayName(string provider)
+    {
+        return provider == ModelProvider.OpenAi ? "OpenAI" : "Gemini";
     }
 
     private void SetRememberApiKeyChecked(bool isChecked)
@@ -563,13 +655,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        var requestModel = GetSelectedModel();
+        SwitchApiKeyProvider(requestModel.Provider);
         var apiKey = NormalizeApiKey(ApiKeyBox.Password);
         var prompt = PromptBox.Text.Trim();
 
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             MessageBox.Show(
-                "Gemini API 키를 입력해 주세요.",
+                $"{GetProviderDisplayName(requestModel.Provider)} API 키를 입력해 주세요.",
                 "API 키 필요",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -581,6 +675,7 @@ public partial class MainWindow : Window
         {
             ApiKeyBox.Password = apiKey;
         }
+        _apiKeys[requestModel.Provider] = apiKey;
 
         if (string.IsNullOrWhiteSpace(prompt) && _attachments.Count == 0)
         {
@@ -594,6 +689,11 @@ public partial class MainWindow : Window
         }
 
         var attachments = _attachments.ToList();
+        if (!ValidateAttachmentsForModel(requestModel, attachments))
+        {
+            return;
+        }
+
         var effectivePrompt = string.IsNullOrWhiteSpace(prompt)
             ? "첨부한 파일의 내용을 분석해 주세요."
             : prompt;
@@ -619,8 +719,9 @@ public partial class MainWindow : Window
 
         var userMessage = new ChatMessage(effectivePrompt + attachmentNames, true, [], storedAttachments);
         Messages.Add(userMessage);
-        var modelMessage = new ChatMessage(string.Empty, false, [], []);
-        var requestModelId = _selectedModelId;
+        var modelMessage = new ChatMessage(string.Empty, false, [], [], requestModel.Id);
+        var requestModelId = requestModel.Id;
+        modelMessage.RefreshModelDisplayName(requestModel.DisplayName);
         modelMessage.IsStreaming = true;
         Messages.Add(modelMessage);
         UpdateMessageActionAvailability();
@@ -654,46 +755,12 @@ public partial class MainWindow : Window
                 Parts = userParts
             };
             var requestContents = _conversationHistory.Append(userContent).ToList();
-            var client = new Client(apiKey: apiKey);
-            var config = WebSearchCheckBox.IsChecked == true
-                ? new GenerateContentConfig
-                {
-                    Tools = [new Tool { GoogleSearch = new GoogleSearch() }]
-                }
-                : null;
-            var collectedSources = new List<ChatSource>();
-
-            await foreach (var chunk in client.Models.GenerateContentStreamAsync(
-                               model: requestModelId,
-                               contents: requestContents,
-                               config: config,
-                               cancellationToken: _generationCancellation.Token))
-            {
-                var chunkText = string.Concat(chunk.Candidates?
-                    .SelectMany(candidate => candidate.Content?.Parts ?? [])
-                    .Select(part => part.Text)
-                    .Where(text => !string.IsNullOrEmpty(text)) ?? []);
-
-                if (!string.IsNullOrEmpty(chunkText))
-                {
-                    modelMessage.Text += chunkText;
-                    ScrollToLatestMessage();
-                }
-
-                collectedSources.AddRange(ExtractSources(chunk));
-            }
-
-            if (string.IsNullOrWhiteSpace(modelMessage.Text))
-            {
-                modelMessage.Text = "응답 내용이 없습니다.";
-            }
-
-            modelMessage.Sources = collectedSources
-                .DistinctBy(source => source.Uri)
-                .ToList();
-            modelMessage.ModelId = requestModelId;
-            modelMessage.RefreshModelDisplayName(GetModelDisplayName(requestModelId));
-            modelMessage.IsStreaming = false;
+            await GenerateModelResponseAsync(
+                modelMessage,
+                apiKey,
+                requestModel,
+                requestContents,
+                _generationCancellation.Token);
 
             SaveRememberedApiKey(showConfirmation: false);
             CompleteExchange(userContent, userMessage, modelMessage, prompt, attachments, "응답 완료 · 저장됨");
@@ -714,11 +781,7 @@ public partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            modelMessage.Text = exception.Message.Contains(
-                "headers must contain only ASCII",
-                StringComparison.OrdinalIgnoreCase)
-                ? "API 키에 사용할 수 없는 문자가 포함되어 있습니다. API 키 입력창을 비우고 Google AI Studio에서 키만 다시 복사해 주세요."
-                : $"요청 중 오류가 발생했습니다.{System.Environment.NewLine}{exception.Message}";
+            modelMessage.Text = FormatRequestError(exception, requestModel.Provider);
             modelMessage.IsStreaming = false;
             StatusText.Text = "요청 실패";
         }
@@ -730,6 +793,125 @@ public partial class MainWindow : Window
             ScrollToLatestMessage();
             PromptBox.Focus();
         }
+    }
+
+    private AiModelOption GetSelectedModel()
+    {
+        return _modelOptions.FirstOrDefault(model => model.Id == _selectedModelId)
+            ?? _modelOptions.First(model => model.Id == DefaultModelId);
+    }
+
+    private async Task GenerateModelResponseAsync(
+        ChatMessage modelMessage,
+        string apiKey,
+        AiModelOption model,
+        IReadOnlyList<Content> requestContents,
+        CancellationToken cancellationToken)
+    {
+        var collectedSources = new List<ChatSource>();
+
+        if (model.Provider == ModelProvider.OpenAi)
+        {
+            await foreach (var chunk in _openAiResponsesService.StreamResponseAsync(
+                               apiKey,
+                               model,
+                               requestContents,
+                               WebSearchCheckBox.IsChecked == true,
+                               cancellationToken))
+            {
+                if (!string.IsNullOrEmpty(chunk.TextDelta))
+                {
+                    modelMessage.Text += chunk.TextDelta;
+                    ScrollToLatestMessage();
+                }
+
+                collectedSources.AddRange(chunk.Sources);
+            }
+        }
+        else
+        {
+            var client = new Client(apiKey: apiKey);
+            var config = WebSearchCheckBox.IsChecked == true
+                ? new GenerateContentConfig
+                {
+                    Tools = [new Tool { GoogleSearch = new GoogleSearch() }]
+                }
+                : null;
+
+            await foreach (var chunk in client.Models.GenerateContentStreamAsync(
+                               model: model.Id,
+                               contents: requestContents.ToList(),
+                               config: config,
+                               cancellationToken: cancellationToken))
+            {
+                var chunkText = string.Concat(chunk.Candidates?
+                    .SelectMany(candidate => candidate.Content?.Parts ?? [])
+                    .Select(part => part.Text)
+                    .Where(text => !string.IsNullOrEmpty(text)) ?? []);
+
+                if (!string.IsNullOrEmpty(chunkText))
+                {
+                    modelMessage.Text += chunkText;
+                    ScrollToLatestMessage();
+                }
+
+                collectedSources.AddRange(ExtractSources(chunk));
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(modelMessage.Text))
+        {
+            modelMessage.Text = "응답 내용이 없습니다.";
+        }
+
+        modelMessage.Sources = collectedSources
+            .DistinctBy(source => source.Uri, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        modelMessage.ModelId = model.Id;
+        modelMessage.RefreshModelDisplayName(model.DisplayName);
+        modelMessage.IsStreaming = false;
+    }
+
+    private static string FormatRequestError(Exception exception, string provider)
+    {
+        if (exception.Message.Contains("headers must contain only ASCII", StringComparison.OrdinalIgnoreCase))
+        {
+            var keySource = provider == ModelProvider.OpenAi ? "OpenAI Platform" : "Google AI Studio";
+            return $"API 키에 사용할 수 없는 문자가 포함되어 있습니다. 입력창을 비우고 {keySource}에서 키만 다시 복사해 주세요.";
+        }
+
+        return $"요청 중 오류가 발생했습니다.{System.Environment.NewLine}{exception.Message}";
+    }
+
+    private static bool ValidateAttachmentsForModel(
+        AiModelOption model,
+        IReadOnlyList<AttachmentItem> attachments)
+    {
+        if (model.Provider != ModelProvider.OpenAi)
+        {
+            return true;
+        }
+
+        var unsupported = attachments
+            .Where(attachment =>
+                attachment.MimeType.Equals("image/bmp", StringComparison.OrdinalIgnoreCase) ||
+                attachment.MimeType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) ||
+                attachment.MimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+            .Select(attachment => attachment.Name)
+            .ToList();
+
+        if (unsupported.Count == 0)
+        {
+            return true;
+        }
+
+        MessageBox.Show(
+            $"GPT-5.6에는 현재 이미지, PDF, 문서 파일을 첨부할 수 있어요.{System.Environment.NewLine}" +
+            $"BMP·오디오·동영상 파일은 빼 주세요: {string.Join(", ", unsupported)}",
+            "GPT 첨부 형식 안내",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+        return false;
     }
 
     private void CompleteExchange(
@@ -977,7 +1159,7 @@ public partial class MainWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Gemini에 보낼 파일 선택",
+            Title = "AI에 보낼 파일 선택",
             Multiselect = true,
             Filter = "지원 파일|*.png;*.jpg;*.jpeg;*.gif;*.webp;*.bmp;*.pdf;*.txt;*.md;*.csv;*.json;*.xml;*.html;*.mp3;*.wav;*.m4a;*.aac;*.ogg;*.mp4;*.mov;*.webm|모든 파일|*.*"
         };
@@ -1188,7 +1370,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        CopyMessageToClipboard(message, "Gemini 응답 전체를 복사했어요");
+        CopyMessageToClipboard(message, "AI 응답 전체를 복사했어요");
     }
 
     private void CopyUserMessageButton_Click(object sender, RoutedEventArgs e)
@@ -1325,11 +1507,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        var requestModel = GetSelectedModel();
+        SwitchApiKeyProvider(requestModel.Provider);
         var apiKey = NormalizeApiKey(ApiKeyBox.Password);
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             MessageBox.Show(
-                "Gemini API 키를 입력해 주세요.",
+                $"{GetProviderDisplayName(requestModel.Provider)} API 키를 입력해 주세요.",
                 "API 키 필요",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -1341,6 +1525,7 @@ public partial class MainWindow : Window
         {
             ApiKeyBox.Password = apiKey;
         }
+        _apiKeys[requestModel.Provider] = apiKey;
 
         var originalUserText = userMessage.Text;
         var originalModelText = modelMessage.Text;
@@ -1349,7 +1534,7 @@ public partial class MainWindow : Window
         var originalUserContent = _conversationHistory[^2];
         var originalModelContent = _conversationHistory[^1];
         var historyPrefixCount = _conversationHistory.Count - 2;
-        var requestModelId = _selectedModelId;
+        var requestModelId = requestModel.Id;
 
         var editedParts = new List<Part> { new() { Text = editedPrompt } };
         if (originalUserContent.Parts is not null)
@@ -1374,7 +1559,7 @@ public partial class MainWindow : Window
         modelMessage.CanRegenerate = false;
         modelMessage.Text = string.Empty;
         modelMessage.ModelId = requestModelId;
-        modelMessage.RefreshModelDisplayName(GetModelDisplayName(requestModelId));
+        modelMessage.RefreshModelDisplayName(requestModel.DisplayName);
         modelMessage.Sources = [];
         modelMessage.IsStreaming = true;
         _generationCancellation = new CancellationTokenSource();
@@ -1383,44 +1568,12 @@ public partial class MainWindow : Window
 
         try
         {
-            var client = new Client(apiKey: apiKey);
-            var config = WebSearchCheckBox.IsChecked == true
-                ? new GenerateContentConfig
-                {
-                    Tools = [new Tool { GoogleSearch = new GoogleSearch() }]
-                }
-                : null;
-            var collectedSources = new List<ChatSource>();
-
-            await foreach (var chunk in client.Models.GenerateContentStreamAsync(
-                               model: requestModelId,
-                               contents: _conversationHistory.ToList(),
-                               config: config,
-                               cancellationToken: _generationCancellation.Token))
-            {
-                var chunkText = string.Concat(chunk.Candidates?
-                    .SelectMany(candidate => candidate.Content?.Parts ?? [])
-                    .Select(part => part.Text)
-                    .Where(text => !string.IsNullOrEmpty(text)) ?? []);
-
-                if (!string.IsNullOrEmpty(chunkText))
-                {
-                    modelMessage.Text += chunkText;
-                    ScrollToLatestMessage();
-                }
-
-                collectedSources.AddRange(ExtractSources(chunk));
-            }
-
-            if (string.IsNullOrWhiteSpace(modelMessage.Text))
-            {
-                modelMessage.Text = "응답 내용이 없습니다.";
-            }
-
-            modelMessage.Sources = collectedSources
-                .DistinctBy(source => source.Uri)
-                .ToList();
-            modelMessage.IsStreaming = false;
+            await GenerateModelResponseAsync(
+                modelMessage,
+                apiKey,
+                requestModel,
+                _conversationHistory.ToList(),
+                _generationCancellation.Token);
 
             _chatStore.ReplaceLatestExchange(_currentConversationId, userMessage, modelMessage);
             _conversationHistory.Add(new Content
@@ -1435,7 +1588,7 @@ public partial class MainWindow : Window
             try
             {
                 RefreshConversations();
-                StatusText.Text = "메시지를 고치고 Gemini 답변도 다시 만들었어요 · 저장됨";
+                StatusText.Text = "메시지를 고치고 AI 답변도 다시 만들었어요 · 저장됨";
             }
             catch
             {
@@ -1570,11 +1723,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        var requestModel = GetSelectedModel();
+        SwitchApiKeyProvider(requestModel.Provider);
         var apiKey = NormalizeApiKey(ApiKeyBox.Password);
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             MessageBox.Show(
-                "Gemini API 키를 입력해 주세요.",
+                $"{GetProviderDisplayName(requestModel.Provider)} API 키를 입력해 주세요.",
                 "API 키 필요",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -1586,18 +1741,19 @@ public partial class MainWindow : Window
         {
             ApiKeyBox.Password = apiKey;
         }
+        _apiKeys[requestModel.Provider] = apiKey;
 
         var originalText = modelMessage.Text;
         var originalModelId = modelMessage.ModelId;
         var originalSources = modelMessage.Sources.ToList();
         var originalContent = _conversationHistory[^1];
-        var requestModelId = _selectedModelId;
+        var requestModelId = requestModel.Id;
         _conversationHistory.RemoveAt(_conversationHistory.Count - 1);
 
         modelMessage.CanRegenerate = false;
         modelMessage.Text = string.Empty;
         modelMessage.ModelId = requestModelId;
-        modelMessage.RefreshModelDisplayName(GetModelDisplayName(requestModelId));
+        modelMessage.RefreshModelDisplayName(requestModel.DisplayName);
         modelMessage.Sources = [];
         modelMessage.IsStreaming = true;
         _generationCancellation = new CancellationTokenSource();
@@ -1606,44 +1762,12 @@ public partial class MainWindow : Window
 
         try
         {
-            var client = new Client(apiKey: apiKey);
-            var config = WebSearchCheckBox.IsChecked == true
-                ? new GenerateContentConfig
-                {
-                    Tools = [new Tool { GoogleSearch = new GoogleSearch() }]
-                }
-                : null;
-            var collectedSources = new List<ChatSource>();
-
-            await foreach (var chunk in client.Models.GenerateContentStreamAsync(
-                               model: requestModelId,
-                               contents: _conversationHistory.ToList(),
-                               config: config,
-                               cancellationToken: _generationCancellation.Token))
-            {
-                var chunkText = string.Concat(chunk.Candidates?
-                    .SelectMany(candidate => candidate.Content?.Parts ?? [])
-                    .Select(part => part.Text)
-                    .Where(text => !string.IsNullOrEmpty(text)) ?? []);
-
-                if (!string.IsNullOrEmpty(chunkText))
-                {
-                    modelMessage.Text += chunkText;
-                    ScrollToLatestMessage();
-                }
-
-                collectedSources.AddRange(ExtractSources(chunk));
-            }
-
-            if (string.IsNullOrWhiteSpace(modelMessage.Text))
-            {
-                modelMessage.Text = "응답 내용이 없습니다.";
-            }
-
-            modelMessage.Sources = collectedSources
-                .DistinctBy(source => source.Uri)
-                .ToList();
-            modelMessage.IsStreaming = false;
+            await GenerateModelResponseAsync(
+                modelMessage,
+                apiKey,
+                requestModel,
+                _conversationHistory.ToList(),
+                _generationCancellation.Token);
 
             _chatStore.ReplaceLatestModelMessage(_currentConversationId, modelMessage);
             _conversationHistory.Add(new Content
@@ -1657,7 +1781,7 @@ public partial class MainWindow : Window
             try
             {
                 RefreshConversations();
-                StatusText.Text = "Gemini 답변을 다시 만들었어요 · 저장됨";
+                StatusText.Text = "AI 답변을 다시 만들었어요 · 저장됨";
             }
             catch
             {
@@ -1757,7 +1881,7 @@ public partial class MainWindow : Window
 
         if (isBusy)
         {
-            StatusText.Text = "Gemini가 답변하는 중…";
+            StatusText.Text = "AI가 답변을 만들고 있어요…";
         }
     }
 
@@ -1853,6 +1977,9 @@ public sealed class ChatMessage : INotifyPropertyChanged
     {
         "gemini-3.5-flash" => "Gemini 3.5 Flash",
         "gemini-3.1-pro-preview" => "Gemini 3.1 Pro Preview",
+        "gpt-5.6-luna" => "GPT-5.6 Luna",
+        "gpt-5.6-terra" => "GPT-5.6 Terra",
+        "gpt-5.6-sol" => "GPT-5.6 Sol",
         "gemini-2.5-flash" => "Gemini 2.5 Flash",
         "legacy-unknown" => "이전 응답 · 모델 정보 없음",
         null or "" => "이전 응답 · 모델 정보 없음",
