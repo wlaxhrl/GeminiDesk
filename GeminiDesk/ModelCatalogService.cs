@@ -60,7 +60,8 @@ public static class ModelCatalogService
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, RemoteCatalogUrl);
+            var catalogUrl = $"{RemoteCatalogUrl}?refresh={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+            using var request = new HttpRequestMessage(HttpMethod.Get, catalogUrl);
             request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
             using var response = await HttpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
