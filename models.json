@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "models": [
+    {
+      "id": "gemini-3.5-flash",
+      "displayName": "Gemini 3.5 Flash",
+      "shortName": "3.5 Flash",
+      "icon": "⚡",
+      "badge": "STABLE",
+      "description": "빠르고 균형 잡힌 안정 버전",
+      "requiresBilling": false
+    },
+    {
+      "id": "gemini-3.1-pro-preview",
+      "displayName": "Gemini 3.1 Pro Preview",
+      "shortName": "3.1 Pro",
+      "icon": "✦",
+      "badge": "PREVIEW",
+      "description": "복잡한 추론에 강한 Preview · Gemini API 무료 티어 없음",
+      "requiresBilling": true
+    }
+  ]
+}

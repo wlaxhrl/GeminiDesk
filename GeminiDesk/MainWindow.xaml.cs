@@ -5,7 +5,9 @@ using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -13,6 +15,7 @@ using System.Windows.Navigation;
 using Google.GenAI;
 using Google.GenAI.Types;
 using Microsoft.Win32;
+using Velopack;
 
 namespace GeminiDesk;
 
@@ -20,21 +23,24 @@ public partial class MainWindow : Window
 {
     private const string ApiKeyCredentialTarget = "GeminiDesk:GoogleGeminiApiKey";
     private const string DefaultModelId = "gemini-3.5-flash";
-    private const string ProModelId = "gemini-3.1-pro-preview";
     private const string SelectedModelSettingKey = "selected-model";
     private const long MaxFileSize = 10 * 1024 * 1024;
     private const long MaxTotalAttachmentSize = 20 * 1024 * 1024;
     private readonly List<Content> _conversationHistory = [];
     private readonly List<AttachmentItem> _attachments = [];
+    private readonly List<GeminiModelOption> _modelOptions = [];
     private readonly WindowsCredentialStore _apiKeyCredentialStore = new(ApiKeyCredentialTarget);
+    private readonly AppUpdateService _appUpdateService = new();
     private readonly ChatStore _chatStore;
     private CancellationTokenSource? _generationCancellation;
+    private UpdateInfo? _availableUpdate;
     private ChatMessage? _editingUserMessage;
     private string? _currentConversationId;
     private string _selectedModelId = DefaultModelId;
     private bool _isUpdatingRememberApiKey;
     private bool _isUpdatingConversationSelection;
-    private bool _isUpdatingModelSelection;
+    private bool _isCheckingForUpdates;
+    private bool _isDownloadingUpdate;
 
     public ObservableCollection<ChatMessage> Messages { get; } = [];
     public ObservableCollection<ConversationSummary> Conversations { get; } = [];
@@ -43,75 +49,328 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = this;
+        VersionText.Text = $"v{_appUpdateService.CurrentVersion}";
+
+        if (!_appUpdateService.IsInstalled)
+        {
+            VersionText.Text += " · DEV";
+            UpdateButton.ToolTip = "Setup 또는 포터블 배포판에서 자동 업데이트가 작동해요";
+        }
+
         LoadRememberedApiKey();
         _chatStore = new ChatStore();
+        _modelOptions.AddRange(ModelCatalogService.LoadInitialCatalog());
         LoadSelectedModel();
         _chatStore.CleanupOrphanedAttachments(TimeSpan.FromDays(7));
         RefreshConversations();
-        ContentRendered += (_, _) => PromptBox.Focus();
+        ContentRendered += MainWindow_ContentRendered;
         PromptBox.Focus();
     }
 
     private void LoadSelectedModel()
     {
+        string? storedModelId = null;
+
         try
         {
-            var storedModelId = _chatStore.GetSetting(SelectedModelSettingKey);
-            _selectedModelId = IsSupportedModel(storedModelId)
-                ? storedModelId!
-                : DefaultModelId;
+            storedModelId = _chatStore.GetSetting(SelectedModelSettingKey);
         }
         catch
         {
-            _selectedModelId = DefaultModelId;
             StatusText.Text = "모델 설정을 불러오지 못해 3.5 Flash를 사용해요";
         }
 
-        _isUpdatingModelSelection = true;
-
-        try
-        {
-            FlashModelRadioButton.IsChecked = _selectedModelId == DefaultModelId;
-            ProModelRadioButton.IsChecked = _selectedModelId == ProModelId;
-        }
-        finally
-        {
-            _isUpdatingModelSelection = false;
-        }
+        var selectedModel = _modelOptions.FirstOrDefault(model => model.Id == storedModelId)
+            ?? _modelOptions.FirstOrDefault(model => model.Id == DefaultModelId)
+            ?? _modelOptions[0];
+        SelectModel(selectedModel, persist: false, showStatus: false);
     }
 
-    private void ModelChoice_Checked(object sender, RoutedEventArgs e)
+    private async void MainWindow_ContentRendered(object? sender, EventArgs e)
     {
-        if (_isUpdatingModelSelection ||
-            sender is not RadioButton { Tag: string modelId } ||
-            !IsSupportedModel(modelId))
+        PromptBox.Focus();
+        await Task.WhenAll(
+            RefreshModelCatalogAsync(),
+            CheckForUpdatesAsync(showNoUpdateMessage: false));
+    }
+
+    private async Task RefreshModelCatalogAsync()
+    {
+        var refreshedModels = await ModelCatalogService.TryRefreshCatalogAsync();
+        if (refreshedModels is null)
         {
             return;
         }
 
-        _selectedModelId = modelId;
+        var selectedModelId = _selectedModelId;
+        _modelOptions.Clear();
+        _modelOptions.AddRange(refreshedModels);
+        var selectedModel = _modelOptions.FirstOrDefault(model => model.Id == selectedModelId)
+            ?? _modelOptions.FirstOrDefault(model => model.Id == DefaultModelId)
+            ?? _modelOptions[0];
+        SelectModel(selectedModel, persist: selectedModel.Id != selectedModelId, showStatus: false);
+
+        foreach (var message in Messages.Where(message => !message.IsUser))
+        {
+            message.RefreshModelDisplayName(GetModelDisplayName(message.ModelId));
+        }
+    }
+
+    private void ModelMenuButton_Click(object sender, RoutedEventArgs e)
+    {
+        var menuWidth = Math.Max(345, ModelMenuButton.ActualWidth);
+        var menu = new ContextMenu
+        {
+            Placement = PlacementMode.Bottom,
+            PlacementTarget = ModelMenuButton,
+            Width = menuWidth
+        };
+        menu.HorizontalOffset = ModelMenuButton.ActualWidth - menuWidth;
+
+        foreach (var model in _modelOptions)
+        {
+            var item = new MenuItem
+            {
+                Header = CreateModelMenuHeader(model),
+                IsCheckable = true,
+                IsChecked = model.Id == _selectedModelId,
+                Padding = new Thickness(10, 7, 10, 7),
+                Tag = model,
+                ToolTip = model.Description
+            };
+            AutomationProperties.SetName(item, model.DisplayName);
+            item.Click += ModelMenuItem_Click;
+            menu.Items.Add(item);
+        }
+
+        ModelMenuButton.ContextMenu = menu;
+        menu.IsOpen = true;
+    }
+
+    private FrameworkElement CreateModelMenuHeader(GeminiModelOption model)
+    {
+        var title = new StackPanel { Orientation = Orientation.Horizontal };
+        title.Children.Add(new TextBlock
+        {
+            Text = model.Icon,
+            Margin = new Thickness(0, 0, 7, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        title.Children.Add(new TextBlock
+        {
+            Text = model.DisplayName,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = (System.Windows.Media.Brush)FindResource("InkBrush")
+        });
+
+        if (!string.IsNullOrWhiteSpace(model.Badge))
+        {
+            title.Children.Add(new Border
+            {
+                Margin = new Thickness(7, 0, 0, 0),
+                Padding = new Thickness(5, 1, 5, 1),
+                VerticalAlignment = VerticalAlignment.Center,
+                Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(255, 237, 244)),
+                CornerRadius = new CornerRadius(6),
+                Child = new TextBlock
+                {
+                    Text = model.Badge,
+                    FontSize = 8,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = new System.Windows.Media.SolidColorBrush(
+                        System.Windows.Media.Color.FromRgb(176, 76, 117))
+                }
+            });
+        }
+
+        var panel = new StackPanel();
+        panel.Children.Add(title);
+        panel.Children.Add(new TextBlock
+        {
+            Text = model.Description,
+            Margin = new Thickness(22, 3, 0, 0),
+            FontSize = 10,
+            MaxWidth = 285,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush")
+        });
+        return panel;
+    }
+
+    private void ModelMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: GeminiModelOption model })
+        {
+            return;
+        }
+
+        SelectModel(model, persist: true, showStatus: true);
+    }
+
+    private void SelectModel(GeminiModelOption model, bool persist, bool showStatus)
+    {
+        _selectedModelId = model.Id;
+        SelectedModelIcon.Text = model.Icon;
+        SelectedModelName.Text = model.ShortName;
+        SelectedModelBadgeText.Text = model.Badge ?? string.Empty;
+        SelectedModelBadge.Visibility = string.IsNullOrWhiteSpace(model.Badge) || model.Badge == "STABLE"
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        ModelMenuButton.ToolTip = model.Description;
+
+        if (persist)
+        {
+            try
+            {
+                _chatStore.SetSetting(SelectedModelSettingKey, model.Id);
+            }
+            catch
+            {
+                StatusText.Text = $"{model.DisplayName}를 사용해요 · 선택 기억 실패";
+                return;
+            }
+        }
+
+        if (showStatus)
+        {
+            StatusText.Text = $"다음 답변부터 {model.DisplayName}를 사용해요";
+        }
+    }
+
+    private string GetModelDisplayName(string? modelId)
+    {
+        return modelId switch
+        {
+            null or "" => "이전 응답 · 모델 정보 없음",
+            "legacy-unknown" => "이전 응답 · 모델 정보 없음",
+            _ => _modelOptions.FirstOrDefault(model => model.Id == modelId)?.DisplayName ?? modelId
+        };
+    }
+
+    private async void UpdateButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isCheckingForUpdates || _isDownloadingUpdate || _generationCancellation is not null)
+        {
+            return;
+        }
+
+        if (_availableUpdate is null)
+        {
+            await CheckForUpdatesAsync(showNoUpdateMessage: true);
+            return;
+        }
+
+        await DownloadAndApplyUpdateAsync(_availableUpdate);
+    }
+
+    private async Task CheckForUpdatesAsync(bool showNoUpdateMessage)
+    {
+        if (_isCheckingForUpdates)
+        {
+            return;
+        }
+
+        if (!_appUpdateService.IsInstalled)
+        {
+            if (showNoUpdateMessage)
+            {
+                StatusText.Text = "Setup 또는 포터블 배포판에서 자동 업데이트를 확인해요";
+            }
+
+            return;
+        }
+
+        _isCheckingForUpdates = true;
+        UpdateButton.IsEnabled = false;
+        UpdateButton.Content = "확인 중…";
 
         try
         {
-            _chatStore.SetSetting(SelectedModelSettingKey, modelId);
-            StatusText.Text = $"다음 답변부터 {GetModelDisplayName(modelId)}를 사용해요";
+            _availableUpdate = await _appUpdateService.CheckForUpdatesAsync();
+
+            if (_availableUpdate is null)
+            {
+                UpdateButton.Content = "업데이트 확인";
+                UpdateDetailText.Visibility = Visibility.Collapsed;
+
+                if (showNoUpdateMessage)
+                {
+                    StatusText.Text = "GeminiDesk가 최신 버전이에요";
+                }
+
+                return;
+            }
+
+            var version = _availableUpdate.TargetFullRelease.Version;
+            UpdateButton.Content = $"v{version} 받기";
+            UpdateDetailText.Text = $"새 버전 v{version}이 준비됐어요 ✨";
+            UpdateDetailText.Visibility = Visibility.Visible;
         }
-        catch
+        catch (Exception exception)
         {
-            StatusText.Text = $"{GetModelDisplayName(modelId)}를 사용해요 · 선택 기억 실패";
+            UpdateButton.Content = "업데이트 확인";
+
+            if (showNoUpdateMessage)
+            {
+                MessageBox.Show(
+                    $"업데이트를 확인하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                    "업데이트 확인 오류",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+        finally
+        {
+            _isCheckingForUpdates = false;
+            UpdateButton.IsEnabled = _generationCancellation is null && !_isDownloadingUpdate;
         }
     }
 
-    private static bool IsSupportedModel(string? modelId)
+    private async Task DownloadAndApplyUpdateAsync(UpdateInfo update)
     {
-        return modelId is DefaultModelId or ProModelId;
-    }
+        var version = update.TargetFullRelease.Version;
+        var answer = MessageBox.Show(
+            $"GeminiDesk v{version}을 내려받아 설치할까요?{System.Environment.NewLine}{System.Environment.NewLine}다운로드가 끝나면 앱이 자동으로 다시 시작돼요.",
+            "새 버전이 있어요 ✨",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Information);
 
-    private static string GetModelDisplayName(string modelId)
-    {
-        return modelId == ProModelId
-            ? "Gemini 3.1 Pro Preview"
-            : "Gemini 3.5 Flash";
+        if (answer != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        _isDownloadingUpdate = true;
+        UpdateButton.IsEnabled = false;
+        UpdateDetailText.Visibility = Visibility.Visible;
+
+        try
+        {
+            await _appUpdateService.DownloadUpdateAsync(update, progress =>
+            {
+                Dispatcher.BeginInvoke(() =>
+                {
+                    UpdateButton.Content = $"받는 중 {progress}%";
+                    UpdateDetailText.Text = $"새 버전을 내려받고 있어요 · {progress}%";
+                });
+            });
+
+            UpdateDetailText.Text = "설치를 시작하고 앱을 다시 열게요";
+            _appUpdateService.ApplyUpdateAndRestart(update);
+        }
+        catch (Exception exception)
+        {
+            _isDownloadingUpdate = false;
+            UpdateButton.IsEnabled = true;
+            UpdateButton.Content = $"v{version} 다시 받기";
+            UpdateDetailText.Text = "업데이트 다운로드에 실패했어요";
+            MessageBox.Show(
+                $"새 버전을 설치하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                "업데이트 오류",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void LoadRememberedApiKey()
@@ -433,6 +692,7 @@ public partial class MainWindow : Window
                 .DistinctBy(source => source.Uri)
                 .ToList();
             modelMessage.ModelId = requestModelId;
+            modelMessage.RefreshModelDisplayName(GetModelDisplayName(requestModelId));
             modelMessage.IsStreaming = false;
 
             SaveRememberedApiKey(showConfirmation: false);
@@ -444,6 +704,7 @@ public partial class MainWindow : Window
                 ? "답변 생성을 중지했습니다."
                 : $"{modelMessage.Text}{System.Environment.NewLine}{System.Environment.NewLine}[생성 중지됨]";
             modelMessage.ModelId = requestModelId;
+            modelMessage.RefreshModelDisplayName(GetModelDisplayName(requestModelId));
             modelMessage.IsStreaming = false;
 
             if (userContent is not null)
@@ -648,6 +909,7 @@ public partial class MainWindow : Window
 
         foreach (var message in storedMessages)
         {
+            message.RefreshModelDisplayName(GetModelDisplayName(message.ModelId));
             Messages.Add(message);
             var parts = new List<Part> { new() { Text = message.Text } };
 
@@ -1112,6 +1374,7 @@ public partial class MainWindow : Window
         modelMessage.CanRegenerate = false;
         modelMessage.Text = string.Empty;
         modelMessage.ModelId = requestModelId;
+        modelMessage.RefreshModelDisplayName(GetModelDisplayName(requestModelId));
         modelMessage.Sources = [];
         modelMessage.IsStreaming = true;
         _generationCancellation = new CancellationTokenSource();
@@ -1257,6 +1520,7 @@ public partial class MainWindow : Window
 
         modelMessage.Text = originalModelText;
         modelMessage.ModelId = originalModelId;
+        modelMessage.RefreshModelDisplayName(GetModelDisplayName(originalModelId));
         modelMessage.Sources = originalModelSources;
         modelMessage.IsStreaming = false;
         UpdateMessageActionAvailability();
@@ -1333,6 +1597,7 @@ public partial class MainWindow : Window
         modelMessage.CanRegenerate = false;
         modelMessage.Text = string.Empty;
         modelMessage.ModelId = requestModelId;
+        modelMessage.RefreshModelDisplayName(GetModelDisplayName(requestModelId));
         modelMessage.Sources = [];
         modelMessage.IsStreaming = true;
         _generationCancellation = new CancellationTokenSource();
@@ -1433,6 +1698,7 @@ public partial class MainWindow : Window
     {
         modelMessage.Text = originalText;
         modelMessage.ModelId = originalModelId;
+        modelMessage.RefreshModelDisplayName(GetModelDisplayName(originalModelId));
         modelMessage.Sources = originalSources;
         modelMessage.IsStreaming = false;
         _conversationHistory.Add(originalContent);
@@ -1484,6 +1750,7 @@ public partial class MainWindow : Window
         ClearAttachmentsButton.IsEnabled = !isBusy && !isEditing && _attachments.Count > 0;
         WebSearchCheckBox.IsEnabled = !isBusy;
         ModelSelector.IsEnabled = !isBusy;
+        UpdateButton.IsEnabled = !isBusy && !isEditing && !_isCheckingForUpdates && !_isDownloadingUpdate;
         ApiKeyBox.IsEnabled = !isBusy;
         RememberApiKeyCheckBox.IsEnabled = !isBusy;
         PromptBox.IsEnabled = !isBusy && !isEditing;
@@ -1512,6 +1779,7 @@ public sealed class ChatMessage : INotifyPropertyChanged
     private string _text;
     private string _editText;
     private string? _modelId;
+    private string _modelDisplayName;
     private IReadOnlyList<ChatSource> _sources;
     private bool _canEdit;
     private bool _canRegenerate;
@@ -1528,6 +1796,7 @@ public sealed class ChatMessage : INotifyPropertyChanged
         _text = text;
         _editText = text;
         _modelId = modelId;
+        _modelDisplayName = GetDefaultModelDisplayName(modelId);
         IsUser = isUser;
         _sources = sources;
         Attachments = attachments;
@@ -1561,19 +1830,33 @@ public sealed class ChatMessage : INotifyPropertyChanged
             }
 
             _modelId = value;
+            _modelDisplayName = GetDefaultModelDisplayName(value);
             OnPropertyChanged();
             OnPropertyChanged(nameof(ModelDisplayName));
         }
     }
 
-    public string ModelDisplayName => ModelId switch
+    public string ModelDisplayName => _modelDisplayName;
+
+    public void RefreshModelDisplayName(string displayName)
+    {
+        if (_modelDisplayName == displayName)
+        {
+            return;
+        }
+
+        _modelDisplayName = displayName;
+        OnPropertyChanged(nameof(ModelDisplayName));
+    }
+
+    private static string GetDefaultModelDisplayName(string? modelId) => modelId switch
     {
         "gemini-3.5-flash" => "Gemini 3.5 Flash",
         "gemini-3.1-pro-preview" => "Gemini 3.1 Pro Preview",
         "gemini-2.5-flash" => "Gemini 2.5 Flash",
         "legacy-unknown" => "이전 응답 · 모델 정보 없음",
         null or "" => "이전 응답 · 모델 정보 없음",
-        _ => ModelId ?? "알 수 없는 Gemini 모델"
+        _ => modelId
     };
 
     public string EditText

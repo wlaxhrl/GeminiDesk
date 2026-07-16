@@ -1,0 +1,112 @@
+name: Release GeminiDesk
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without the v prefix (for example 0.1.1)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Resolve release version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ inputs.version }}"
+          } else {
+            $version = "${{ github.ref_name }}".TrimStart('v')
+          }
+
+          if ($version -notmatch '^\d+\.\d+\.\d+([-.+][0-9A-Za-z.-]+)?$') {
+            throw "Invalid semantic version: $version"
+          }
+
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "tag=v$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Download previous release for delta generation
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          New-Item -ItemType Directory -Path artifacts/Releases -Force | Out-Null
+          dotnet vpk download github `
+            --repoUrl "https://github.com/wlaxhrl/GeminiDesk" `
+            --token $env:GITHUB_TOKEN `
+            --outputDir artifacts/Releases `
+            --channel win
+
+      - name: Publish application
+        shell: pwsh
+        run: |
+          dotnet publish GeminiDesk/GeminiDesk.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output artifacts/publish `
+            -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Create release notes
+        shell: pwsh
+        run: |
+          $message = git log -1 --pretty=%B
+          @"
+          # GeminiDesk v${{ steps.version.outputs.version }}
+
+          $message
+          "@ | Set-Content artifacts/release-notes.md -Encoding utf8
+
+      - name: Package installer and updates
+        shell: pwsh
+        run: |
+          dotnet vpk pack `
+            --packId GeminiDesk `
+            --packVersion ${{ steps.version.outputs.version }} `
+            --packDir artifacts/publish `
+            --mainExe GeminiDesk.exe `
+            --packTitle GeminiDesk `
+            --packAuthors wlaxhrl `
+            --runtime win-x64 `
+            --releaseNotes artifacts/release-notes.md `
+            --outputDir artifacts/Releases
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          dotnet vpk upload github `
+            --repoUrl "https://github.com/wlaxhrl/GeminiDesk" `
+            --token $env:GITHUB_TOKEN `
+            --outputDir artifacts/Releases `
+            --channel win `
+            --publish true `
+            --releaseName "GeminiDesk v${{ steps.version.outputs.version }}" `
+            --tag "${{ steps.version.outputs.tag }}" `
+            --targetCommitish "${{ github.sha }}"
