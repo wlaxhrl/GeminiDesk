@@ -511,6 +511,22 @@
                                                     BorderThickness="1"
                                                     CornerRadius="17">
                                                 <StackPanel>
+                                                    <StackPanel x:Name="WaitingPanel"
+                                                                MinWidth="240"
+                                                                AutomationProperties.Name="AI 답변 준비 중"
+                                                                Visibility="Collapsed">
+                                                        <TextBlock FontFamily="Segoe UI Variable Text, Malgun Gothic"
+                                                                   FontSize="13"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="#FF655AA8"
+                                                                   Text="답변 준비 중이에요…" />
+                                                        <ProgressBar Height="5"
+                                                                     Margin="0,10,0,2"
+                                                                     Background="{StaticResource PrimarySoftBrush}"
+                                                                     BorderThickness="0"
+                                                                     Foreground="{StaticResource PrimaryBrush}"
+                                                                     IsIndeterminate="True" />
+                                                    </StackPanel>
                                                     <TextBox x:Name="MessageText"
                                                              Padding="0"
                                                              Background="Transparent"
@@ -770,6 +786,15 @@
                                                 <Setter TargetName="MessageText" Property="Visibility" Value="Visible" />
                                                 <Setter TargetName="MarkdownMessage" Property="Visibility" Value="Collapsed" />
                                             </DataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsUser}" Value="False" />
+                                                    <Condition Binding="{Binding IsStreaming}" Value="True" />
+                                                    <Condition Binding="{Binding Text}" Value="" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter TargetName="WaitingPanel" Property="Visibility" Value="Visible" />
+                                                <Setter TargetName="MessageText" Property="Visibility" Value="Collapsed" />
+                                            </MultiDataTrigger>
                                             <DataTrigger Binding="{Binding ModelId}" Value="{x:Null}">
                                                 <Setter TargetName="ResponseModelBadge" Property="Visibility" Value="Collapsed" />
                                             </DataTrigger>
