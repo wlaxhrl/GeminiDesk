@@ -1,0 +1,41 @@
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# .NET build output
+**/bin/
+**/obj/
+artifacts/
+publish/
+TestResults/
+
+# Local app data
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+attachments/
+Attachments/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+appsettings.Development.json
+appsettings.Local.json
+*.pfx
+*.snk
+
+# Codex / local agent metadata
+.agents/
+.codex/
+
+# Miscellaneous
+*.log
+*.tmp
+Thumbs.db
+Desktop.ini
