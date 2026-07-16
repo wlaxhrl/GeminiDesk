@@ -693,6 +693,27 @@
                                                         HorizontalAlignment="Left"
                                                         Orientation="Horizontal"
                                                         Visibility="Collapsed">
+                                                <Border x:Name="ResponseModelBadge"
+                                                        Height="25"
+                                                        Margin="0,1,7,0"
+                                                        Padding="8,3"
+                                                        VerticalAlignment="Top"
+                                                        Background="{StaticResource PrimarySoftBrush}"
+                                                        CornerRadius="8"
+                                                        ToolTip="{Binding ModelId}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Margin="0,0,4,0"
+                                                                   FontSize="10"
+                                                                   Foreground="{StaticResource PrimaryBrush}"
+                                                                   Text="✦" />
+                                                        <TextBlock x:Name="ResponseModelName"
+                                                                   FontFamily="Segoe UI Variable Text, Malgun Gothic"
+                                                                   FontSize="10"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="#FF5D51C6"
+                                                                   Text="{Binding ModelDisplayName}" />
+                                                    </StackPanel>
+                                                </Border>
                                                 <Button AutomationProperties.Name="응답 전체 복사"
                                                         Click="CopyResponseButton_Click"
                                                         Content="&#xE8C8;"
@@ -731,6 +752,14 @@
                                             <DataTrigger Binding="{Binding IsStreaming}" Value="True">
                                                 <Setter TargetName="MessageText" Property="Visibility" Value="Visible" />
                                                 <Setter TargetName="MarkdownMessage" Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ModelId}" Value="{x:Null}">
+                                                <Setter TargetName="ResponseModelBadge" Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ModelId}" Value="legacy-unknown">
+                                                <Setter TargetName="ResponseModelBadge" Property="Background" Value="Transparent" />
+                                                <Setter TargetName="ResponseModelBadge" Property="ToolTip" Value="이 응답은 모델 기록 기능이 생기기 전에 저장됐어요" />
+                                                <Setter TargetName="ResponseModelName" Property="Foreground" Value="{StaticResource MutedBrush}" />
                                             </DataTrigger>
                                             <MultiDataTrigger>
                                                 <MultiDataTrigger.Conditions>

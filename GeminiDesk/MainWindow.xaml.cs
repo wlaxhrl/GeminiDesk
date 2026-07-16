@@ -361,6 +361,7 @@ public partial class MainWindow : Window
         var userMessage = new ChatMessage(effectivePrompt + attachmentNames, true, [], storedAttachments);
         Messages.Add(userMessage);
         var modelMessage = new ChatMessage(string.Empty, false, [], []);
+        var requestModelId = _selectedModelId;
         modelMessage.IsStreaming = true;
         Messages.Add(modelMessage);
         UpdateMessageActionAvailability();
@@ -404,7 +405,7 @@ public partial class MainWindow : Window
             var collectedSources = new List<ChatSource>();
 
             await foreach (var chunk in client.Models.GenerateContentStreamAsync(
-                               model: _selectedModelId,
+                               model: requestModelId,
                                contents: requestContents,
                                config: config,
                                cancellationToken: _generationCancellation.Token))
@@ -431,6 +432,7 @@ public partial class MainWindow : Window
             modelMessage.Sources = collectedSources
                 .DistinctBy(source => source.Uri)
                 .ToList();
+            modelMessage.ModelId = requestModelId;
             modelMessage.IsStreaming = false;
 
             SaveRememberedApiKey(showConfirmation: false);
@@ -441,6 +443,7 @@ public partial class MainWindow : Window
             modelMessage.Text = string.IsNullOrWhiteSpace(modelMessage.Text)
                 ? "답변 생성을 중지했습니다."
                 : $"{modelMessage.Text}{System.Environment.NewLine}{System.Environment.NewLine}[생성 중지됨]";
+            modelMessage.ModelId = requestModelId;
             modelMessage.IsStreaming = false;
 
             if (userContent is not null)
@@ -1079,10 +1082,12 @@ public partial class MainWindow : Window
 
         var originalUserText = userMessage.Text;
         var originalModelText = modelMessage.Text;
+        var originalModelId = modelMessage.ModelId;
         var originalModelSources = modelMessage.Sources.ToList();
         var originalUserContent = _conversationHistory[^2];
         var originalModelContent = _conversationHistory[^1];
         var historyPrefixCount = _conversationHistory.Count - 2;
+        var requestModelId = _selectedModelId;
 
         var editedParts = new List<Part> { new() { Text = editedPrompt } };
         if (originalUserContent.Parts is not null)
@@ -1106,6 +1111,7 @@ public partial class MainWindow : Window
 
         modelMessage.CanRegenerate = false;
         modelMessage.Text = string.Empty;
+        modelMessage.ModelId = requestModelId;
         modelMessage.Sources = [];
         modelMessage.IsStreaming = true;
         _generationCancellation = new CancellationTokenSource();
@@ -1124,7 +1130,7 @@ public partial class MainWindow : Window
             var collectedSources = new List<ChatSource>();
 
             await foreach (var chunk in client.Models.GenerateContentStreamAsync(
-                               model: _selectedModelId,
+                               model: requestModelId,
                                contents: _conversationHistory.ToList(),
                                config: config,
                                cancellationToken: _generationCancellation.Token))
@@ -1181,6 +1187,7 @@ public partial class MainWindow : Window
                 originalUserText,
                 editedPrompt,
                 originalModelText,
+                originalModelId,
                 originalModelSources,
                 originalUserContent,
                 originalModelContent,
@@ -1195,6 +1202,7 @@ public partial class MainWindow : Window
                 originalUserText,
                 editedPrompt,
                 originalModelText,
+                originalModelId,
                 originalModelSources,
                 originalUserContent,
                 originalModelContent,
@@ -1226,6 +1234,7 @@ public partial class MainWindow : Window
         string originalUserText,
         string editedPrompt,
         string originalModelText,
+        string? originalModelId,
         IReadOnlyList<ChatSource> originalModelSources,
         Content originalUserContent,
         Content originalModelContent,
@@ -1247,6 +1256,7 @@ public partial class MainWindow : Window
         _editingUserMessage = userMessage;
 
         modelMessage.Text = originalModelText;
+        modelMessage.ModelId = originalModelId;
         modelMessage.Sources = originalModelSources;
         modelMessage.IsStreaming = false;
         UpdateMessageActionAvailability();
@@ -1314,12 +1324,15 @@ public partial class MainWindow : Window
         }
 
         var originalText = modelMessage.Text;
+        var originalModelId = modelMessage.ModelId;
         var originalSources = modelMessage.Sources.ToList();
         var originalContent = _conversationHistory[^1];
+        var requestModelId = _selectedModelId;
         _conversationHistory.RemoveAt(_conversationHistory.Count - 1);
 
         modelMessage.CanRegenerate = false;
         modelMessage.Text = string.Empty;
+        modelMessage.ModelId = requestModelId;
         modelMessage.Sources = [];
         modelMessage.IsStreaming = true;
         _generationCancellation = new CancellationTokenSource();
@@ -1338,7 +1351,7 @@ public partial class MainWindow : Window
             var collectedSources = new List<ChatSource>();
 
             await foreach (var chunk in client.Models.GenerateContentStreamAsync(
-                               model: _selectedModelId,
+                               model: requestModelId,
                                contents: _conversationHistory.ToList(),
                                config: config,
                                cancellationToken: _generationCancellation.Token))
@@ -1388,12 +1401,12 @@ public partial class MainWindow : Window
         }
         catch (OperationCanceledException) when (_generationCancellation.IsCancellationRequested)
         {
-            RestoreOriginalResponse(modelMessage, originalText, originalSources, originalContent);
+            RestoreOriginalResponse(modelMessage, originalText, originalModelId, originalSources, originalContent);
             StatusText.Text = "답변 다시 생성을 중지했어요";
         }
         catch (Exception exception)
         {
-            RestoreOriginalResponse(modelMessage, originalText, originalSources, originalContent);
+            RestoreOriginalResponse(modelMessage, originalText, originalModelId, originalSources, originalContent);
             StatusText.Text = "답변 다시 생성 실패";
             MessageBox.Show(
                 $"답변을 다시 생성하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
@@ -1414,10 +1427,12 @@ public partial class MainWindow : Window
     private void RestoreOriginalResponse(
         ChatMessage modelMessage,
         string originalText,
+        string? originalModelId,
         IReadOnlyList<ChatSource> originalSources,
         Content originalContent)
     {
         modelMessage.Text = originalText;
+        modelMessage.ModelId = originalModelId;
         modelMessage.Sources = originalSources;
         modelMessage.IsStreaming = false;
         _conversationHistory.Add(originalContent);
@@ -1496,6 +1511,7 @@ public sealed class ChatMessage : INotifyPropertyChanged
 {
     private string _text;
     private string _editText;
+    private string? _modelId;
     private IReadOnlyList<ChatSource> _sources;
     private bool _canEdit;
     private bool _canRegenerate;
@@ -1506,10 +1522,12 @@ public sealed class ChatMessage : INotifyPropertyChanged
         string text,
         bool isUser,
         IReadOnlyList<ChatSource> sources,
-        IReadOnlyList<ChatAttachment> attachments)
+        IReadOnlyList<ChatAttachment> attachments,
+        string? modelId = null)
     {
         _text = text;
         _editText = text;
+        _modelId = modelId;
         IsUser = isUser;
         _sources = sources;
         Attachments = attachments;
@@ -1531,6 +1549,32 @@ public sealed class ChatMessage : INotifyPropertyChanged
     }
 
     public bool IsUser { get; }
+
+    public string? ModelId
+    {
+        get => _modelId;
+        set
+        {
+            if (_modelId == value)
+            {
+                return;
+            }
+
+            _modelId = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ModelDisplayName));
+        }
+    }
+
+    public string ModelDisplayName => ModelId switch
+    {
+        "gemini-3.5-flash" => "Gemini 3.5 Flash",
+        "gemini-3.1-pro-preview" => "Gemini 3.1 Pro Preview",
+        "gemini-2.5-flash" => "Gemini 2.5 Flash",
+        "legacy-unknown" => "이전 응답 · 모델 정보 없음",
+        null or "" => "이전 응답 · 모델 정보 없음",
+        _ => ModelId ?? "알 수 없는 Gemini 모델"
+    };
 
     public string EditText
     {

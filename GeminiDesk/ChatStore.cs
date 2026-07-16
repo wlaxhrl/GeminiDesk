@@ -115,13 +115,14 @@ public sealed class ChatStore
         using var messageCommand = connection.CreateCommand();
         messageCommand.Transaction = transaction;
         messageCommand.CommandText = """
-            INSERT INTO Messages (ConversationId, Role, Text, CreatedAtUtc)
-            VALUES ($conversationId, $role, $text, $createdAt);
+            INSERT INTO Messages (ConversationId, Role, Text, ModelId, CreatedAtUtc)
+            VALUES ($conversationId, $role, $text, $modelId, $createdAt);
             SELECT last_insert_rowid();
             """;
         messageCommand.Parameters.AddWithValue("$conversationId", conversationId);
         messageCommand.Parameters.AddWithValue("$role", message.IsUser ? "user" : "model");
         messageCommand.Parameters.AddWithValue("$text", message.Text);
+        messageCommand.Parameters.AddWithValue("$modelId", (object?)message.ModelId ?? DBNull.Value);
         messageCommand.Parameters.AddWithValue("$createdAt", DateTime.UtcNow.ToString("O"));
         var messageId = (long)(messageCommand.ExecuteScalar() ?? throw new InvalidOperationException("메시지 저장에 실패했습니다."));
 
@@ -186,8 +187,13 @@ public sealed class ChatStore
 
         using var updateMessageCommand = connection.CreateCommand();
         updateMessageCommand.Transaction = transaction;
-        updateMessageCommand.CommandText = "UPDATE Messages SET Text = $text WHERE Id = $messageId;";
+        updateMessageCommand.CommandText = """
+            UPDATE Messages
+            SET Text = $text, ModelId = $modelId
+            WHERE Id = $messageId;
+            """;
         updateMessageCommand.Parameters.AddWithValue("$text", message.Text);
+        updateMessageCommand.Parameters.AddWithValue("$modelId", (object?)message.ModelId ?? DBNull.Value);
         updateMessageCommand.Parameters.AddWithValue("$messageId", messageId);
         updateMessageCommand.ExecuteNonQuery();
 
@@ -268,8 +274,13 @@ public sealed class ChatStore
 
         using var updateModelCommand = connection.CreateCommand();
         updateModelCommand.Transaction = transaction;
-        updateModelCommand.CommandText = "UPDATE Messages SET Text = $text WHERE Id = $messageId;";
+        updateModelCommand.CommandText = """
+            UPDATE Messages
+            SET Text = $text, ModelId = $modelId
+            WHERE Id = $messageId;
+            """;
         updateModelCommand.Parameters.AddWithValue("$text", modelMessage.Text);
+        updateModelCommand.Parameters.AddWithValue("$modelId", (object?)modelMessage.ModelId ?? DBNull.Value);
         updateModelCommand.Parameters.AddWithValue("$messageId", modelMessageId);
         updateModelCommand.ExecuteNonQuery();
 
@@ -309,7 +320,7 @@ public sealed class ChatStore
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT Id, Role, Text
+            SELECT Id, Role, Text, ModelId
             FROM Messages
             WHERE ConversationId = $conversationId
             ORDER BY Id;
@@ -317,11 +328,15 @@ public sealed class ChatStore
         command.Parameters.AddWithValue("$conversationId", conversationId);
 
         using var reader = command.ExecuteReader();
-        var rows = new List<(long Id, string Role, string Text)>();
+        var rows = new List<(long Id, string Role, string Text, string? ModelId)>();
 
         while (reader.Read())
         {
-            rows.Add((reader.GetInt64(0), reader.GetString(1), reader.GetString(2)));
+            rows.Add((
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3)));
         }
 
         reader.Close();
@@ -334,7 +349,8 @@ public sealed class ChatStore
                 row.Text,
                 row.Role == "user",
                 GetSources(connection, row.Id),
-                GetAttachments(connection, row.Id)));
+                GetAttachments(connection, row.Id),
+                row.Role == "model" ? row.ModelId ?? "legacy-unknown" : null));
         }
 
         return messages;
@@ -426,6 +442,7 @@ public sealed class ChatStore
                 ConversationId TEXT NOT NULL,
                 Role TEXT NOT NULL,
                 Text TEXT NOT NULL,
+                ModelId TEXT,
                 CreatedAtUtc TEXT NOT NULL,
                 FOREIGN KEY (ConversationId) REFERENCES Conversations(Id) ON DELETE CASCADE
             );
@@ -458,6 +475,36 @@ public sealed class ChatStore
             CREATE INDEX IF NOT EXISTS IX_Sources_MessageId ON Sources(MessageId);
             """;
         command.ExecuteNonQuery();
+        EnsureMessageModelIdColumn(connection);
+    }
+
+    private static void EnsureMessageModelIdColumn(SqliteConnection connection)
+    {
+        var hasModelIdColumn = false;
+
+        using (var schemaCommand = connection.CreateCommand())
+        {
+            schemaCommand.CommandText = "PRAGMA table_info(Messages);";
+            using var reader = schemaCommand.ExecuteReader();
+
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), "ModelId", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasModelIdColumn = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasModelIdColumn)
+        {
+            return;
+        }
+
+        using var migrationCommand = connection.CreateCommand();
+        migrationCommand.CommandText = "ALTER TABLE Messages ADD COLUMN ModelId TEXT;";
+        migrationCommand.ExecuteNonQuery();
     }
 
     private SqliteConnection OpenConnection()
