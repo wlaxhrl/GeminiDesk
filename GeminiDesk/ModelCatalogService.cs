@@ -187,7 +187,7 @@ public static class ModelCatalogService
                 ShortName = "Sol Standard",
                 Icon = "☀",
                 Badge = "STANDARD",
-                Description = "비싸고 빨라요!",
+                Description = "제일 똑똑해요 · 비싸고 빨라요!",
                 RequiresBilling = true,
                 ReasoningEffort = "max"
             },
@@ -200,7 +200,7 @@ public static class ModelCatalogService
                 ShortName = "Sol Flex",
                 Icon = "☀",
                 Badge = "FLEX",
-                Description = "느리고 반값!",
+                Description = "제일 똑똑해요 · 느리고 반값!",
                 RequiresBilling = true,
                 ReasoningEffort = "max",
                 ServiceTier = "flex"

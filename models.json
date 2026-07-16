@@ -49,7 +49,7 @@
       "shortName": "Sol Standard",
       "icon": "☀",
       "badge": "STANDARD",
-      "description": "비싸고 빨라요!",
+      "description": "제일 똑똑해요 · 비싸고 빨라요!",
       "requiresBilling": true,
       "reasoningEffort": "max"
     },
@@ -61,7 +61,7 @@
       "shortName": "Sol Flex",
       "icon": "☀",
       "badge": "FLEX",
-      "description": "느리고 반값!",
+      "description": "제일 똑똑해요 · 느리고 반값!",
       "requiresBilling": true,
       "reasoningEffort": "max",
       "serviceTier": "flex"
