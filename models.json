@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "models": [
     {
       "id": "gemini-3.5-flash",
@@ -20,6 +20,17 @@
       "badge": "PREVIEW",
       "description": "복잡한 추론에 강한 Preview",
       "requiresBilling": true
+    },
+    {
+      "id": "gemini-3.1-flash-image",
+      "provider": "google",
+      "displayName": "Nano Banana 2",
+      "shortName": "Nano Banana 2",
+      "icon": "🍌",
+      "badge": "IMAGE",
+      "description": "빠르고 똑똑한 이미지 생성·편집 모델",
+      "requiresBilling": true,
+      "outputKind": "image"
     },
     {
       "id": "gpt-5.6-luna",
@@ -65,6 +76,17 @@
       "requiresBilling": true,
       "reasoningEffort": "max",
       "serviceTier": "flex"
+    },
+    {
+      "id": "gpt-image-2",
+      "provider": "openai",
+      "displayName": "GPT Image 2",
+      "shortName": "GPT Image 2",
+      "icon": "🎨",
+      "badge": "IMAGE",
+      "description": "빠르고 고품질인 이미지 생성·편집 모델",
+      "requiresBilling": true,
+      "outputKind": "image"
     }
   ]
 }

@@ -11,6 +11,12 @@ public static class ModelProvider
     public const string OpenAi = "openai";
 }
 
+public static class ModelOutputKind
+{
+    public const string Text = "text";
+    public const string Image = "image";
+}
+
 public sealed record AiModelOption
 {
     public string Id { get; init; } = string.Empty;
@@ -24,13 +30,15 @@ public sealed record AiModelOption
     public bool RequiresBilling { get; init; }
     public string? ReasoningEffort { get; init; }
     public string? ServiceTier { get; init; }
+    public string OutputKind { get; init; } = ModelOutputKind.Text;
 
     public string RequestModelId => string.IsNullOrWhiteSpace(ApiModelId) ? Id : ApiModelId;
+    public bool IsImageGeneration => OutputKind == ModelOutputKind.Image;
 }
 
 public static class ModelCatalogService
 {
-    private const int CurrentSchemaVersion = 3;
+    private const int CurrentSchemaVersion = 4;
     private const string RemoteCatalogUrl =
         "https://raw.githubusercontent.com/wlaxhrl/GeminiDesk/main/models.json";
 
@@ -129,7 +137,8 @@ public static class ModelCatalogService
                 (model.ApiModelId.Length <= 100 &&
                  model.ApiModelId.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.'))) &&
                (model.ReasoningEffort is null or "none" or "low" or "medium" or "high" or "xhigh" or "max") &&
-               model.ServiceTier is null or "flex";
+               model.ServiceTier is null or "flex" &&
+               model.OutputKind is ModelOutputKind.Text or ModelOutputKind.Image;
     }
 
     private static IReadOnlyList<AiModelOption> CreateEmergencyCatalog()
@@ -156,6 +165,18 @@ public static class ModelCatalogService
                 Badge = "PREVIEW",
                 Description = "복잡한 추론에 강한 Preview",
                 RequiresBilling = true
+            },
+            new()
+            {
+                Id = "gemini-3.1-flash-image",
+                Provider = ModelProvider.Google,
+                DisplayName = "Nano Banana 2",
+                ShortName = "Nano Banana 2",
+                Icon = "🍌",
+                Badge = "IMAGE",
+                Description = "빠르고 똑똑한 이미지 생성·편집 모델",
+                RequiresBilling = true,
+                OutputKind = ModelOutputKind.Image
             },
             new()
             {
@@ -205,6 +226,18 @@ public static class ModelCatalogService
                 RequiresBilling = true,
                 ReasoningEffort = "max",
                 ServiceTier = "flex"
+            },
+            new()
+            {
+                Id = "gpt-image-2",
+                Provider = ModelProvider.OpenAi,
+                DisplayName = "GPT Image 2",
+                ShortName = "GPT Image 2",
+                Icon = "🎨",
+                Badge = "IMAGE",
+                Description = "빠르고 고품질인 이미지 생성·편집 모델",
+                RequiresBilling = true,
+                OutputKind = ModelOutputKind.Image
             }
         ];
     }

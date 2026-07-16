@@ -184,6 +184,7 @@ public sealed class ChatStore
         var messageIdValue = selectCommand.ExecuteScalar()
             ?? throw new InvalidOperationException("다시 생성할 AI 응답을 찾지 못했습니다.");
         var messageId = Convert.ToInt64(messageIdValue, CultureInfo.InvariantCulture);
+        var replacedAttachmentPaths = GetAttachmentPaths(connection, transaction, messageId);
 
         using var updateMessageCommand = connection.CreateCommand();
         updateMessageCommand.Transaction = transaction;
@@ -217,6 +218,8 @@ public sealed class ChatStore
             sourceCommand.ExecuteNonQuery();
         }
 
+        ReplaceAttachments(connection, transaction, messageId, message.Attachments);
+
         using var updateConversationCommand = connection.CreateCommand();
         updateConversationCommand.Transaction = transaction;
         updateConversationCommand.CommandText = """
@@ -226,6 +229,7 @@ public sealed class ChatStore
         updateConversationCommand.Parameters.AddWithValue("$id", conversationId);
         updateConversationCommand.ExecuteNonQuery();
         transaction.Commit();
+        DeleteReplacedAttachmentFiles(replacedAttachmentPaths, message.Attachments);
     }
 
     public void ReplaceLatestExchange(
@@ -249,6 +253,7 @@ public sealed class ChatStore
         var modelMessageIdValue = selectModelCommand.ExecuteScalar()
             ?? throw new InvalidOperationException("편집할 메시지의 AI 응답을 찾지 못했습니다.");
         var modelMessageId = Convert.ToInt64(modelMessageIdValue, CultureInfo.InvariantCulture);
+        var replacedAttachmentPaths = GetAttachmentPaths(connection, transaction, modelMessageId);
 
         using var selectUserCommand = connection.CreateCommand();
         selectUserCommand.Transaction = transaction;
@@ -304,6 +309,8 @@ public sealed class ChatStore
             sourceCommand.ExecuteNonQuery();
         }
 
+        ReplaceAttachments(connection, transaction, modelMessageId, modelMessage.Attachments);
+
         using var updateConversationCommand = connection.CreateCommand();
         updateConversationCommand.Transaction = transaction;
         updateConversationCommand.CommandText = """
@@ -313,6 +320,7 @@ public sealed class ChatStore
         updateConversationCommand.Parameters.AddWithValue("$id", conversationId);
         updateConversationCommand.ExecuteNonQuery();
         transaction.Commit();
+        DeleteReplacedAttachmentFiles(replacedAttachmentPaths, modelMessage.Attachments);
     }
 
     public IReadOnlyList<ChatMessage> GetMessages(string conversationId)
@@ -555,6 +563,85 @@ public sealed class ChatStore
         }
 
         return attachments;
+    }
+
+    private static IReadOnlyList<string> GetAttachmentPaths(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long messageId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT StoredPath FROM Attachments WHERE MessageId = $messageId;";
+        command.Parameters.AddWithValue("$messageId", messageId);
+        using var reader = command.ExecuteReader();
+        var paths = new List<string>();
+
+        while (reader.Read())
+        {
+            paths.Add(reader.GetString(0));
+        }
+
+        return paths;
+    }
+
+    private static void ReplaceAttachments(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        long messageId,
+        IReadOnlyList<ChatAttachment> attachments)
+    {
+        using (var deleteCommand = connection.CreateCommand())
+        {
+            deleteCommand.Transaction = transaction;
+            deleteCommand.CommandText = "DELETE FROM Attachments WHERE MessageId = $messageId;";
+            deleteCommand.Parameters.AddWithValue("$messageId", messageId);
+            deleteCommand.ExecuteNonQuery();
+        }
+
+        foreach (var attachment in attachments)
+        {
+            using var insertCommand = connection.CreateCommand();
+            insertCommand.Transaction = transaction;
+            insertCommand.CommandText = """
+                INSERT INTO Attachments (MessageId, OriginalName, StoredPath, Size, MimeType)
+                VALUES ($messageId, $originalName, $storedPath, $size, $mimeType);
+                """;
+            insertCommand.Parameters.AddWithValue("$messageId", messageId);
+            insertCommand.Parameters.AddWithValue("$originalName", attachment.Name);
+            insertCommand.Parameters.AddWithValue("$storedPath", attachment.Path);
+            insertCommand.Parameters.AddWithValue("$size", attachment.Size);
+            insertCommand.Parameters.AddWithValue("$mimeType", attachment.MimeType);
+            insertCommand.ExecuteNonQuery();
+        }
+    }
+
+    private static void DeleteReplacedAttachmentFiles(
+        IReadOnlyList<string> replacedPaths,
+        IReadOnlyList<ChatAttachment> currentAttachments)
+    {
+        var currentPaths = currentAttachments
+            .Select(attachment => attachment.Path)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var path in replacedPaths.Where(path => !currentPaths.Contains(path)))
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch (IOException)
+            {
+                // 파일이 사용 중이면 다음 고아 첨부 정리에서 다시 처리합니다.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // 파일이 잠겨 있으면 다음 고아 첨부 정리에서 다시 처리합니다.
+            }
+        }
     }
 
     private static IReadOnlyList<string> GetAttachmentPaths(SqliteConnection connection, string conversationId)

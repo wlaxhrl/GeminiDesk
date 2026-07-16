@@ -590,8 +590,8 @@
                                                                         CornerRadius="12">
                                                                     <StackPanel>
                                                                         <Image x:Name="AttachmentPreview"
-                                                                               MaxWidth="440"
-                                                                               MaxHeight="270"
+                                                                               MaxWidth="600"
+                                                                               MaxHeight="420"
                                                                                Margin="0,0,0,9"
                                                                                HorizontalAlignment="Left"
                                                                                Source="{Binding Path, Converter={StaticResource AttachmentPreviewConverter}}"

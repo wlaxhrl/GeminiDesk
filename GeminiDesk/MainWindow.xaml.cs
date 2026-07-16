@@ -40,6 +40,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, string> _apiKeys = new(StringComparer.Ordinal);
     private readonly HashSet<string> _rememberedApiKeyProviders = new(StringComparer.Ordinal);
     private readonly OpenAiResponsesService _openAiResponsesService = new();
+    private readonly ImageGenerationService _imageGenerationService = new();
     private readonly AppUpdateService _appUpdateService = new();
     private readonly ChatStore _chatStore;
     private CancellationTokenSource? _generationCancellation;
@@ -257,6 +258,7 @@ public partial class MainWindow : Window
             ? Visibility.Collapsed
             : Visibility.Visible;
         ModelMenuButton.ToolTip = model.Description;
+        UpdateWebSearchAvailability(model);
 
         if (persist)
         {
@@ -284,8 +286,19 @@ public partial class MainWindow : Window
             null or "" => "이전 응답 · 모델 정보 없음",
             "legacy-unknown" => "이전 응답 · 모델 정보 없음",
             LegacySolModelId => "GPT-5.6 Sol",
+            "gemini-3.1-flash-image" => "Nano Banana 2",
+            "gpt-image-2" => "GPT Image 2",
             _ => _modelOptions.FirstOrDefault(model => model.Id == modelId)?.DisplayName ?? modelId
         };
+    }
+
+    private void UpdateWebSearchAvailability(AiModelOption model)
+    {
+        var supportsWebSearch = model.Provider == ModelProvider.Google || !model.IsImageGeneration;
+        WebSearchCheckBox.IsEnabled = _generationCancellation is null && supportsWebSearch;
+        WebSearchCheckBox.ToolTip = supportsWebSearch
+            ? null
+            : "GPT Image 2에서는 검색을 함께 사용할 수 없어요";
     }
 
     private async void UpdateButton_Click(object sender, RoutedEventArgs e)
@@ -699,7 +712,9 @@ public partial class MainWindow : Window
         }
 
         var effectivePrompt = string.IsNullOrWhiteSpace(prompt)
-            ? "첨부한 파일의 내용을 분석해 주세요."
+            ? requestModel.IsImageGeneration
+                ? "첨부한 이미지를 자연스럽게 편집해 주세요."
+                : "첨부한 파일의 내용을 분석해 주세요."
             : prompt;
         var attachmentNames = attachments.Count == 0
             ? string.Empty
@@ -814,7 +829,24 @@ public partial class MainWindow : Window
     {
         var collectedSources = new List<ChatSource>();
 
-        if (model.Provider == ModelProvider.OpenAi)
+        if (model.IsImageGeneration)
+        {
+            var result = await _imageGenerationService.GenerateAsync(
+                apiKey,
+                model,
+                requestContents,
+                WebSearchCheckBox.IsChecked == true,
+                cancellationToken);
+            modelMessage.Text = string.IsNullOrWhiteSpace(result.Text)
+                ? "이미지를 만들었어요."
+                : result.Text.Trim();
+            modelMessage.Attachments = await PreserveGeneratedImagesAsync(
+                result.Images,
+                model,
+                cancellationToken);
+            ScrollToLatestMessage();
+        }
+        else if (model.Provider == ModelProvider.OpenAi)
         {
             await foreach (var chunk in _openAiResponsesService.StreamResponseAsync(
                                apiKey,
@@ -891,6 +923,30 @@ public partial class MainWindow : Window
         AiModelOption model,
         IReadOnlyList<AttachmentItem> attachments)
     {
+        if (model.IsImageGeneration)
+        {
+            var unsupportedImages = attachments
+                .Where(attachment =>
+                    !attachment.MimeType.Equals("image/png", StringComparison.OrdinalIgnoreCase) &&
+                    !attachment.MimeType.Equals("image/jpeg", StringComparison.OrdinalIgnoreCase) &&
+                    !attachment.MimeType.Equals("image/webp", StringComparison.OrdinalIgnoreCase))
+                .Select(attachment => attachment.Name)
+                .ToList();
+
+            if (unsupportedImages.Count == 0)
+            {
+                return true;
+            }
+
+            MessageBox.Show(
+                $"{model.DisplayName}에는 PNG·JPG·WebP 참고 이미지를 첨부할 수 있어요.{System.Environment.NewLine}" +
+                $"다른 형식은 빼 주세요: {string.Join(", ", unsupportedImages)}",
+                "이미지 첨부 형식 안내",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return false;
+        }
+
         if (model.Provider != ModelProvider.OpenAi)
         {
             return true;
@@ -927,11 +983,7 @@ public partial class MainWindow : Window
         string successStatus)
     {
         _conversationHistory.Add(userContent);
-        _conversationHistory.Add(new Content
-        {
-            Role = "model",
-            Parts = [new Part { Text = modelMessage.Text }]
-        });
+        _conversationHistory.Add(CreateModelHistoryContent(modelMessage));
         _attachments.Clear();
         UpdateAttachmentSummary();
 
@@ -1252,6 +1304,105 @@ public partial class MainWindow : Window
         return stored;
     }
 
+    private static async Task<IReadOnlyList<ChatAttachment>> PreserveGeneratedImagesAsync(
+        IReadOnlyList<GeneratedImageData> images,
+        AiModelOption model,
+        CancellationToken cancellationToken)
+    {
+        var attachmentFolder = Path.Combine(
+            System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
+            "GeminiDesk",
+            "Attachments");
+        Directory.CreateDirectory(attachmentFolder);
+        var stored = new List<ChatAttachment>();
+        var createdPaths = new List<string>();
+        var friendlyPrefix = model.Provider == ModelProvider.Google ? "nano-banana-2" : "gpt-image-2";
+        var generatedAt = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+
+        try
+        {
+            for (var index = 0; index < images.Count; index++)
+            {
+                var image = images[index];
+                var extension = GetGeneratedImageExtension(image.MimeType);
+                var storedPath = Path.Combine(attachmentFolder, $"{Guid.NewGuid():N}{extension}");
+                createdPaths.Add(storedPath);
+                await System.IO.File.WriteAllBytesAsync(storedPath, image.Data, cancellationToken);
+                var suffix = images.Count > 1 ? $"-{index + 1}" : string.Empty;
+                stored.Add(new ChatAttachment(
+                    $"{friendlyPrefix}-{generatedAt}{suffix}{extension}",
+                    storedPath,
+                    image.Data.LongLength,
+                    image.MimeType,
+                    true));
+            }
+
+            return stored;
+        }
+        catch
+        {
+            DeleteAttachmentFiles(createdPaths);
+            throw;
+        }
+    }
+
+    private static string GetGeneratedImageExtension(string mimeType) => mimeType.ToLowerInvariant() switch
+    {
+        "image/jpeg" => ".jpg",
+        "image/webp" => ".webp",
+        _ => ".png"
+    };
+
+    private static Content CreateModelHistoryContent(ChatMessage modelMessage)
+    {
+        var parts = new List<Part> { new() { Text = modelMessage.Text } };
+
+        foreach (var attachment in modelMessage.Attachments)
+        {
+            if (!attachment.IsImage || !System.IO.File.Exists(attachment.Path))
+            {
+                continue;
+            }
+
+            parts.Add(new Part
+            {
+                InlineData = new Blob
+                {
+                    Data = System.IO.File.ReadAllBytes(attachment.Path),
+                    MimeType = attachment.MimeType
+                }
+            });
+        }
+
+        return new Content
+        {
+            Role = "model",
+            Parts = parts
+        };
+    }
+
+    private static void DeleteAttachmentFiles(IEnumerable<string> paths)
+    {
+        foreach (var path in paths.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                if (System.IO.File.Exists(path))
+                {
+                    System.IO.File.Delete(path);
+                }
+            }
+            catch (IOException)
+            {
+                // 다음 고아 첨부 정리에서 다시 삭제합니다.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // 다음 고아 첨부 정리에서 다시 삭제합니다.
+            }
+        }
+    }
+
     private void OpenAttachmentButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { Tag: ChatAttachment attachment })
@@ -1535,6 +1686,7 @@ public partial class MainWindow : Window
         var originalModelText = modelMessage.Text;
         var originalModelId = modelMessage.ModelId;
         var originalModelSources = modelMessage.Sources.ToList();
+        var originalModelAttachments = modelMessage.Attachments.ToList();
         var originalUserContent = _conversationHistory[^2];
         var originalModelContent = _conversationHistory[^1];
         var historyPrefixCount = _conversationHistory.Count - 2;
@@ -1565,6 +1717,7 @@ public partial class MainWindow : Window
         modelMessage.ModelId = requestModelId;
         modelMessage.RefreshModelDisplayName(requestModel.DisplayName);
         modelMessage.Sources = [];
+        modelMessage.Attachments = [];
         modelMessage.IsStreaming = true;
         _generationCancellation = new CancellationTokenSource();
         SetBusy(true);
@@ -1579,12 +1732,9 @@ public partial class MainWindow : Window
                 _conversationHistory.ToList(),
                 _generationCancellation.Token);
 
+            var regeneratedModelContent = CreateModelHistoryContent(modelMessage);
             _chatStore.ReplaceLatestExchange(_currentConversationId, userMessage, modelMessage);
-            _conversationHistory.Add(new Content
-            {
-                Role = "model",
-                Parts = [new Part { Text = modelMessage.Text }]
-            });
+            _conversationHistory.Add(regeneratedModelContent);
             userMessage.EditText = editedPrompt;
             SaveRememberedApiKey(showConfirmation: false);
             UpdateMessageActionAvailability();
@@ -1609,6 +1759,7 @@ public partial class MainWindow : Window
                 originalModelText,
                 originalModelId,
                 originalModelSources,
+                originalModelAttachments,
                 originalUserContent,
                 originalModelContent,
                 historyPrefixCount);
@@ -1624,6 +1775,7 @@ public partial class MainWindow : Window
                 originalModelText,
                 originalModelId,
                 originalModelSources,
+                originalModelAttachments,
                 originalUserContent,
                 originalModelContent,
                 historyPrefixCount);
@@ -1656,6 +1808,7 @@ public partial class MainWindow : Window
         string originalModelText,
         string? originalModelId,
         IReadOnlyList<ChatSource> originalModelSources,
+        IReadOnlyList<ChatAttachment> originalModelAttachments,
         Content originalUserContent,
         Content originalModelContent,
         int historyPrefixCount)
@@ -1675,10 +1828,15 @@ public partial class MainWindow : Window
         userMessage.IsEditing = true;
         _editingUserMessage = userMessage;
 
+        DeleteAttachmentFiles(modelMessage.Attachments
+            .Where(attachment => originalModelAttachments.All(original =>
+                !string.Equals(original.Path, attachment.Path, StringComparison.OrdinalIgnoreCase)))
+            .Select(attachment => attachment.Path));
         modelMessage.Text = originalModelText;
         modelMessage.ModelId = originalModelId;
         modelMessage.RefreshModelDisplayName(GetModelDisplayName(originalModelId));
         modelMessage.Sources = originalModelSources;
+        modelMessage.Attachments = originalModelAttachments;
         modelMessage.IsStreaming = false;
         UpdateMessageActionAvailability();
     }
@@ -1750,6 +1908,7 @@ public partial class MainWindow : Window
         var originalText = modelMessage.Text;
         var originalModelId = modelMessage.ModelId;
         var originalSources = modelMessage.Sources.ToList();
+        var originalAttachments = modelMessage.Attachments.ToList();
         var originalContent = _conversationHistory[^1];
         var requestModelId = requestModel.Id;
         _conversationHistory.RemoveAt(_conversationHistory.Count - 1);
@@ -1759,6 +1918,7 @@ public partial class MainWindow : Window
         modelMessage.ModelId = requestModelId;
         modelMessage.RefreshModelDisplayName(requestModel.DisplayName);
         modelMessage.Sources = [];
+        modelMessage.Attachments = [];
         modelMessage.IsStreaming = true;
         _generationCancellation = new CancellationTokenSource();
         SetBusy(true);
@@ -1773,12 +1933,9 @@ public partial class MainWindow : Window
                 _conversationHistory.ToList(),
                 _generationCancellation.Token);
 
+            var regeneratedModelContent = CreateModelHistoryContent(modelMessage);
             _chatStore.ReplaceLatestModelMessage(_currentConversationId, modelMessage);
-            _conversationHistory.Add(new Content
-            {
-                Role = "model",
-                Parts = [new Part { Text = modelMessage.Text }]
-            });
+            _conversationHistory.Add(regeneratedModelContent);
             SaveRememberedApiKey(showConfirmation: false);
             UpdateMessageActionAvailability();
 
@@ -1794,12 +1951,24 @@ public partial class MainWindow : Window
         }
         catch (OperationCanceledException) when (_generationCancellation.IsCancellationRequested)
         {
-            RestoreOriginalResponse(modelMessage, originalText, originalModelId, originalSources, originalContent);
+            RestoreOriginalResponse(
+                modelMessage,
+                originalText,
+                originalModelId,
+                originalSources,
+                originalAttachments,
+                originalContent);
             StatusText.Text = "답변 다시 생성을 중지했어요";
         }
         catch (Exception exception)
         {
-            RestoreOriginalResponse(modelMessage, originalText, originalModelId, originalSources, originalContent);
+            RestoreOriginalResponse(
+                modelMessage,
+                originalText,
+                originalModelId,
+                originalSources,
+                originalAttachments,
+                originalContent);
             StatusText.Text = "답변 다시 생성 실패";
             MessageBox.Show(
                 $"답변을 다시 생성하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
@@ -1822,12 +1991,18 @@ public partial class MainWindow : Window
         string originalText,
         string? originalModelId,
         IReadOnlyList<ChatSource> originalSources,
+        IReadOnlyList<ChatAttachment> originalAttachments,
         Content originalContent)
     {
+        DeleteAttachmentFiles(modelMessage.Attachments
+            .Where(attachment => originalAttachments.All(original =>
+                !string.Equals(original.Path, attachment.Path, StringComparison.OrdinalIgnoreCase)))
+            .Select(attachment => attachment.Path));
         modelMessage.Text = originalText;
         modelMessage.ModelId = originalModelId;
         modelMessage.RefreshModelDisplayName(GetModelDisplayName(originalModelId));
         modelMessage.Sources = originalSources;
+        modelMessage.Attachments = originalAttachments;
         modelMessage.IsStreaming = false;
         _conversationHistory.Add(originalContent);
         UpdateMessageActionAvailability();
@@ -1876,7 +2051,9 @@ public partial class MainWindow : Window
         DeleteChatButton.IsEnabled = !isBusy && !isEditing;
         AttachButton.IsEnabled = !isBusy && !isEditing;
         ClearAttachmentsButton.IsEnabled = !isBusy && !isEditing && _attachments.Count > 0;
-        WebSearchCheckBox.IsEnabled = !isBusy;
+        var selectedModel = GetSelectedModel();
+        WebSearchCheckBox.IsEnabled = !isBusy &&
+            (selectedModel.Provider == ModelProvider.Google || !selectedModel.IsImageGeneration);
         ModelSelector.IsEnabled = !isBusy;
         UpdateButton.IsEnabled = !isBusy && !isEditing && !_isCheckingForUpdates && !_isDownloadingUpdate;
         ApiKeyBox.IsEnabled = !isBusy;
@@ -1909,6 +2086,7 @@ public sealed class ChatMessage : INotifyPropertyChanged
     private string? _modelId;
     private string _modelDisplayName;
     private IReadOnlyList<ChatSource> _sources;
+    private IReadOnlyList<ChatAttachment> _attachments;
     private bool _canEdit;
     private bool _canRegenerate;
     private bool _isEditing;
@@ -1927,7 +2105,7 @@ public sealed class ChatMessage : INotifyPropertyChanged
         _modelDisplayName = GetDefaultModelDisplayName(modelId);
         IsUser = isUser;
         _sources = sources;
-        Attachments = attachments;
+        _attachments = attachments;
     }
 
     public string Text
@@ -1986,6 +2164,8 @@ public sealed class ChatMessage : INotifyPropertyChanged
         "gpt-5.6-sol" => "GPT-5.6 Sol",
         "gpt-5.6-sol-standard" => "GPT-5.6 Sol Standard",
         "gpt-5.6-sol-flex" => "GPT-5.6 Sol Flex",
+        "gemini-3.1-flash-image" => "Nano Banana 2",
+        "gpt-image-2" => "GPT Image 2",
         "gemini-2.5-flash" => "Gemini 2.5 Flash",
         "legacy-unknown" => "이전 응답 · 모델 정보 없음",
         null or "" => "이전 응답 · 모델 정보 없음",
@@ -2082,7 +2262,20 @@ public sealed class ChatMessage : INotifyPropertyChanged
         }
     }
 
-    public IReadOnlyList<ChatAttachment> Attachments { get; }
+    public IReadOnlyList<ChatAttachment> Attachments
+    {
+        get => _attachments;
+        set
+        {
+            if (ReferenceEquals(_attachments, value))
+            {
+                return;
+            }
+
+            _attachments = value;
+            OnPropertyChanged();
+        }
+    }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
