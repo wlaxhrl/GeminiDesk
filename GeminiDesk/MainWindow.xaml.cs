@@ -19,7 +19,9 @@ namespace GeminiDesk;
 public partial class MainWindow : Window
 {
     private const string ApiKeyCredentialTarget = "GeminiDesk:GoogleGeminiApiKey";
-    private const string ModelName = "gemini-2.5-flash";
+    private const string DefaultModelId = "gemini-3.5-flash";
+    private const string ProModelId = "gemini-3.1-pro-preview";
+    private const string SelectedModelSettingKey = "selected-model";
     private const long MaxFileSize = 10 * 1024 * 1024;
     private const long MaxTotalAttachmentSize = 20 * 1024 * 1024;
     private readonly List<Content> _conversationHistory = [];
@@ -29,8 +31,10 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _generationCancellation;
     private ChatMessage? _editingUserMessage;
     private string? _currentConversationId;
+    private string _selectedModelId = DefaultModelId;
     private bool _isUpdatingRememberApiKey;
     private bool _isUpdatingConversationSelection;
+    private bool _isUpdatingModelSelection;
 
     public ObservableCollection<ChatMessage> Messages { get; } = [];
     public ObservableCollection<ConversationSummary> Conversations { get; } = [];
@@ -41,10 +45,73 @@ public partial class MainWindow : Window
         DataContext = this;
         LoadRememberedApiKey();
         _chatStore = new ChatStore();
+        LoadSelectedModel();
         _chatStore.CleanupOrphanedAttachments(TimeSpan.FromDays(7));
         RefreshConversations();
         ContentRendered += (_, _) => PromptBox.Focus();
         PromptBox.Focus();
+    }
+
+    private void LoadSelectedModel()
+    {
+        try
+        {
+            var storedModelId = _chatStore.GetSetting(SelectedModelSettingKey);
+            _selectedModelId = IsSupportedModel(storedModelId)
+                ? storedModelId!
+                : DefaultModelId;
+        }
+        catch
+        {
+            _selectedModelId = DefaultModelId;
+            StatusText.Text = "모델 설정을 불러오지 못해 3.5 Flash를 사용해요";
+        }
+
+        _isUpdatingModelSelection = true;
+
+        try
+        {
+            FlashModelRadioButton.IsChecked = _selectedModelId == DefaultModelId;
+            ProModelRadioButton.IsChecked = _selectedModelId == ProModelId;
+        }
+        finally
+        {
+            _isUpdatingModelSelection = false;
+        }
+    }
+
+    private void ModelChoice_Checked(object sender, RoutedEventArgs e)
+    {
+        if (_isUpdatingModelSelection ||
+            sender is not RadioButton { Tag: string modelId } ||
+            !IsSupportedModel(modelId))
+        {
+            return;
+        }
+
+        _selectedModelId = modelId;
+
+        try
+        {
+            _chatStore.SetSetting(SelectedModelSettingKey, modelId);
+            StatusText.Text = $"다음 답변부터 {GetModelDisplayName(modelId)}를 사용해요";
+        }
+        catch
+        {
+            StatusText.Text = $"{GetModelDisplayName(modelId)}를 사용해요 · 선택 기억 실패";
+        }
+    }
+
+    private static bool IsSupportedModel(string? modelId)
+    {
+        return modelId is DefaultModelId or ProModelId;
+    }
+
+    private static string GetModelDisplayName(string modelId)
+    {
+        return modelId == ProModelId
+            ? "Gemini 3.1 Pro Preview"
+            : "Gemini 3.5 Flash";
     }
 
     private void LoadRememberedApiKey()
@@ -337,7 +404,7 @@ public partial class MainWindow : Window
             var collectedSources = new List<ChatSource>();
 
             await foreach (var chunk in client.Models.GenerateContentStreamAsync(
-                               model: ModelName,
+                               model: _selectedModelId,
                                contents: requestContents,
                                config: config,
                                cancellationToken: _generationCancellation.Token))
@@ -1057,7 +1124,7 @@ public partial class MainWindow : Window
             var collectedSources = new List<ChatSource>();
 
             await foreach (var chunk in client.Models.GenerateContentStreamAsync(
-                               model: ModelName,
+                               model: _selectedModelId,
                                contents: _conversationHistory.ToList(),
                                config: config,
                                cancellationToken: _generationCancellation.Token))
@@ -1271,7 +1338,7 @@ public partial class MainWindow : Window
             var collectedSources = new List<ChatSource>();
 
             await foreach (var chunk in client.Models.GenerateContentStreamAsync(
-                               model: ModelName,
+                               model: _selectedModelId,
                                contents: _conversationHistory.ToList(),
                                config: config,
                                cancellationToken: _generationCancellation.Token))
@@ -1401,6 +1468,7 @@ public partial class MainWindow : Window
         AttachButton.IsEnabled = !isBusy && !isEditing;
         ClearAttachmentsButton.IsEnabled = !isBusy && !isEditing && _attachments.Count > 0;
         WebSearchCheckBox.IsEnabled = !isBusy;
+        ModelSelector.IsEnabled = !isBusy;
         ApiKeyBox.IsEnabled = !isBusy;
         RememberApiKeyCheckBox.IsEnabled = !isBusy;
         PromptBox.IsEnabled = !isBusy && !isEditing;

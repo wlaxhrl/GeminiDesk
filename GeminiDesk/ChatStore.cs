@@ -29,6 +29,29 @@ public sealed class ChatStore
         InitializeDatabase();
     }
 
+    public string? GetSetting(string key)
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Value FROM AppSettings WHERE Key = $key;";
+        command.Parameters.AddWithValue("$key", key);
+        return command.ExecuteScalar() as string;
+    }
+
+    public void SetSetting(string key, string value)
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO AppSettings (Key, Value)
+            VALUES ($key, $value)
+            ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value;
+            """;
+        command.Parameters.AddWithValue("$key", key);
+        command.Parameters.AddWithValue("$value", value);
+        command.ExecuteNonQuery();
+    }
+
     public IReadOnlyList<ConversationSummary> GetConversations()
     {
         using var connection = OpenConnection();
@@ -423,6 +446,11 @@ public sealed class ChatStore
                 Title TEXT NOT NULL,
                 Uri TEXT NOT NULL,
                 FOREIGN KEY (MessageId) REFERENCES Messages(Id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS AppSettings (
+                Key TEXT PRIMARY KEY,
+                Value TEXT NOT NULL
             );
 
             CREATE INDEX IF NOT EXISTS IX_Messages_ConversationId ON Messages(ConversationId);

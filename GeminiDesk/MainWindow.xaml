@@ -121,6 +121,43 @@
             </Setter>
         </Style>
 
+        <Style x:Key="ModelChoiceButton" TargetType="RadioButton">
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="FontFamily" Value="Segoe UI Variable Text, Malgun Gothic" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="ToolTipService.InitialShowDelay" Value="250" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="ModelChoiceBorder"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="11">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ModelChoiceBorder" Property="Background" Value="#99FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="ModelChoiceBorder" Property="Background" Value="White" />
+                                <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ModelChoiceBorder" Property="Opacity" Value="0.48" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource PillButton}">
             <Setter Property="Background" Value="#FFFFF1F3" />
             <Setter Property="BorderThickness" Value="0" />
@@ -310,16 +347,52 @@
             </Grid.RowDefinitions>
 
             <DockPanel Grid.Row="0" Margin="2,0,2,18">
-                <Border DockPanel.Dock="Right"
-                        Padding="12,6"
-                        VerticalAlignment="Center"
-                        Background="{StaticResource PrimarySoftBrush}"
-                        CornerRadius="12">
-                    <TextBlock FontSize="11"
+                <StackPanel x:Name="ModelSelector"
+                            DockPanel.Dock="Right"
+                            Margin="18,0,0,0"
+                            VerticalAlignment="Center">
+                    <TextBlock Margin="5,0,0,4"
+                               FontSize="10"
                                FontWeight="SemiBold"
-                               Foreground="#FF5D51C6"
-                               Text="✦ gemini-2.5-flash" />
-                </Border>
+                               Foreground="{StaticResource MutedBrush}"
+                               Text="사용할 모델" />
+                    <Border Padding="4"
+                            Background="{StaticResource PrimarySoftBrush}"
+                            CornerRadius="15">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="FlashModelRadioButton"
+                                         AutomationProperties.Name="Gemini 3.5 Flash 선택"
+                                         GroupName="GeminiModel"
+                                         Checked="ModelChoice_Checked"
+                                         Content="⚡ 3.5 Flash"
+                                         Style="{StaticResource ModelChoiceButton}"
+                                         Tag="gemini-3.5-flash"
+                                         ToolTip="빠르고 균형 잡힌 안정 버전" />
+                            <RadioButton x:Name="ProModelRadioButton"
+                                         Margin="3,0,0,0"
+                                         AutomationProperties.Name="Gemini 3.1 Pro 선택"
+                                         GroupName="GeminiModel"
+                                         Checked="ModelChoice_Checked"
+                                         Style="{StaticResource ModelChoiceButton}"
+                                         Tag="gemini-3.1-pro-preview"
+                                         ToolTip="복잡한 추론에 강한 Preview · Gemini API 무료 티어 없음">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock VerticalAlignment="Center" Text="✦ 3.1 Pro" />
+                                    <Border Margin="6,0,0,0"
+                                            Padding="5,1"
+                                            VerticalAlignment="Center"
+                                            Background="#FFFFEDF4"
+                                            CornerRadius="6">
+                                        <TextBlock FontSize="8"
+                                                   FontWeight="Bold"
+                                                   Foreground="#FFB04C75"
+                                                   Text="PREVIEW" />
+                                    </Border>
+                                </StackPanel>
+                            </RadioButton>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
                 <StackPanel>
                     <TextBlock FontSize="27"
                                FontWeight="Bold"
