@@ -116,11 +116,16 @@ internal sealed class OpenAiResponsesService
 
         var payload = new JsonObject
         {
-            ["model"] = model.Id,
+            ["model"] = model.RequestModelId,
             ["input"] = input,
             ["stream"] = true,
             ["store"] = false
         };
+
+        if (!string.IsNullOrWhiteSpace(model.ServiceTier))
+        {
+            payload["service_tier"] = model.ServiceTier;
+        }
 
         if (allowWebSearch)
         {

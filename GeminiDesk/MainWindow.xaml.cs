@@ -24,6 +24,8 @@ public partial class MainWindow : Window
     private const string GoogleApiKeyCredentialTarget = "GeminiDesk:GoogleGeminiApiKey";
     private const string OpenAiApiKeyCredentialTarget = "GeminiDesk:OpenAIApiKey";
     private const string DefaultModelId = "gemini-3.5-flash";
+    private const string LegacySolModelId = "gpt-5.6-sol";
+    private const string StandardSolModelId = "gpt-5.6-sol-standard";
     private const string SelectedModelSettingKey = "selected-model";
     private const long MaxFileSize = 10 * 1024 * 1024;
     private const long MaxTotalAttachmentSize = 20 * 1024 * 1024;
@@ -90,10 +92,11 @@ public partial class MainWindow : Window
             StatusText.Text = "모델 설정을 불러오지 못해 3.5 Flash를 사용해요";
         }
 
-        var selectedModel = _modelOptions.FirstOrDefault(model => model.Id == storedModelId)
+        var normalizedModelId = storedModelId == LegacySolModelId ? StandardSolModelId : storedModelId;
+        var selectedModel = _modelOptions.FirstOrDefault(model => model.Id == normalizedModelId)
             ?? _modelOptions.FirstOrDefault(model => model.Id == DefaultModelId)
             ?? _modelOptions[0];
-        SelectModel(selectedModel, persist: false, showStatus: false);
+        SelectModel(selectedModel, persist: normalizedModelId != storedModelId, showStatus: false);
     }
 
     private async void MainWindow_ContentRendered(object? sender, EventArgs e)
@@ -280,6 +283,7 @@ public partial class MainWindow : Window
         {
             null or "" => "이전 응답 · 모델 정보 없음",
             "legacy-unknown" => "이전 응답 · 모델 정보 없음",
+            LegacySolModelId => "GPT-5.6 Sol",
             _ => _modelOptions.FirstOrDefault(model => model.Id == modelId)?.DisplayName ?? modelId
         };
     }
@@ -1980,6 +1984,8 @@ public sealed class ChatMessage : INotifyPropertyChanged
         "gpt-5.6-luna" => "GPT-5.6 Luna",
         "gpt-5.6-terra" => "GPT-5.6 Terra",
         "gpt-5.6-sol" => "GPT-5.6 Sol",
+        "gpt-5.6-sol-standard" => "GPT-5.6 Sol Standard",
+        "gpt-5.6-sol-flex" => "GPT-5.6 Sol Flex",
         "gemini-2.5-flash" => "Gemini 2.5 Flash",
         "legacy-unknown" => "이전 응답 · 모델 정보 없음",
         null or "" => "이전 응답 · 모델 정보 없음",

@@ -14,6 +14,7 @@ public static class ModelProvider
 public sealed record AiModelOption
 {
     public string Id { get; init; } = string.Empty;
+    public string? ApiModelId { get; init; }
     public string Provider { get; init; } = ModelProvider.Google;
     public string DisplayName { get; init; } = string.Empty;
     public string ShortName { get; init; } = string.Empty;
@@ -22,11 +23,14 @@ public sealed record AiModelOption
     public string Description { get; init; } = string.Empty;
     public bool RequiresBilling { get; init; }
     public string? ReasoningEffort { get; init; }
+    public string? ServiceTier { get; init; }
+
+    public string RequestModelId => string.IsNullOrWhiteSpace(ApiModelId) ? Id : ApiModelId;
 }
 
 public static class ModelCatalogService
 {
-    private const int CurrentSchemaVersion = 2;
+    private const int CurrentSchemaVersion = 3;
     private const string RemoteCatalogUrl =
         "https://raw.githubusercontent.com/wlaxhrl/GeminiDesk/main/models.json";
 
@@ -95,7 +99,7 @@ public static class ModelCatalogService
     private static ParsedModelCatalog? ParseCatalog(string json)
     {
         var catalog = JsonSerializer.Deserialize<ModelCatalogDocument>(json, JsonOptions);
-        if (catalog is null || catalog.SchemaVersion is < 1 or > 2 || catalog.Models is null)
+        if (catalog is null || catalog.SchemaVersion is < 1 or > CurrentSchemaVersion || catalog.Models is null)
         {
             return null;
         }
@@ -120,7 +124,11 @@ public static class ModelCatalogService
                !string.IsNullOrWhiteSpace(model.Icon) &&
                !string.IsNullOrWhiteSpace(model.Description) &&
                model.Provider is ModelProvider.Google or ModelProvider.OpenAi &&
-               (model.ReasoningEffort is null or "none" or "low" or "medium" or "high" or "xhigh" or "max");
+               (model.ApiModelId is null ||
+                (model.ApiModelId.Length <= 100 &&
+                 model.ApiModelId.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.'))) &&
+               (model.ReasoningEffort is null or "none" or "low" or "medium" or "high" or "xhigh" or "max") &&
+               model.ServiceTier is null or "flex";
     }
 
     private static IReadOnlyList<AiModelOption> CreateEmergencyCatalog()
@@ -172,15 +180,30 @@ public static class ModelCatalogService
             },
             new()
             {
-                Id = "gpt-5.6-sol",
+                Id = "gpt-5.6-sol-standard",
+                ApiModelId = "gpt-5.6-sol",
                 Provider = ModelProvider.OpenAi,
-                DisplayName = "GPT-5.6 Sol",
-                ShortName = "5.6 Sol",
+                DisplayName = "GPT-5.6 Sol Standard",
+                ShortName = "Sol Standard",
                 Icon = "☀",
-                Badge = "MAX",
-                Description = "가장 어려운 작업용 · 추론 강도 최대",
+                Badge = "STANDARD",
+                Description = "비싸고 빨라요!",
                 RequiresBilling = true,
                 ReasoningEffort = "max"
+            },
+            new()
+            {
+                Id = "gpt-5.6-sol-flex",
+                ApiModelId = "gpt-5.6-sol",
+                Provider = ModelProvider.OpenAi,
+                DisplayName = "GPT-5.6 Sol Flex",
+                ShortName = "Sol Flex",
+                Icon = "☀",
+                Badge = "FLEX",
+                Description = "느리고 반값!",
+                RequiresBilling = true,
+                ReasoningEffort = "max",
+                ServiceTier = "flex"
             }
         ];
     }

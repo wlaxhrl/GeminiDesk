@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <StartupObject>GeminiDesk.App</StartupObject>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
