@@ -12,6 +12,7 @@ $artifactsRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot 'artifacts')
 $publishDir = [System.IO.Path]::GetFullPath((Join-Path $artifactsRoot 'publish'))
 $releaseDir = [System.IO.Path]::GetFullPath((Join-Path $artifactsRoot 'Releases'))
 $projectPath = Join-Path $repoRoot 'GeminiDesk\GeminiDesk.csproj'
+$appIconPath = Join-Path $repoRoot 'GeminiDesk\Assets\bunny-app.ico'
 
 if (-not $publishDir.StartsWith($artifactsRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
     -not $releaseDir.StartsWith($artifactsRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -57,6 +58,7 @@ try {
         --mainExe GeminiDesk.exe `
         --packTitle 'Bunny Desk' `
         --packAuthors wlaxhrl `
+        --icon $appIconPath `
         --runtime win-x64 `
         --outputDir $releaseDir
     if ($LASTEXITCODE -ne 0) { throw 'Velopack 패키지 생성에 실패했습니다.' }

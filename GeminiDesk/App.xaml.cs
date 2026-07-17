@@ -12,6 +12,7 @@ public partial class App : Application
 
         var app = new App();
         app.InitializeComponent();
+        FileAssociationService.RegisterKeyPresetIcon();
         app.Run();
     }
 }

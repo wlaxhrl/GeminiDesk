@@ -6,6 +6,7 @@
     <Version>0.2.1</Version>
     <AssemblyTitle>Bunny Desk</AssemblyTitle>
     <Product>Bunny Desk</Product>
+    <ApplicationIcon>Assets\bunny-app.ico</ApplicationIcon>
     <StartupObject>GeminiDesk.App</StartupObject>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -19,8 +20,12 @@
 
   <ItemGroup>
     <None Remove="Assets\bunny-guide.png" />
+    <None Remove="Assets\bunny-keys.ico" />
     <None Remove="Assets\bunny-mascot.png" />
     <None Remove="Assets\bunny-model-guide.png" />
+    <Content Include="Assets\bunny-keys.ico"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
     <Resource Include="Assets\bunny-guide.png" />
     <Resource Include="Assets\bunny-mascot.png" />
     <Resource Include="Assets\bunny-model-guide.png" />

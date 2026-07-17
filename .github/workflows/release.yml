@@ -92,6 +92,7 @@ jobs:
             --mainExe GeminiDesk.exe `
             --packTitle "Bunny Desk" `
             --packAuthors wlaxhrl `
+            --icon GeminiDesk/Assets/bunny-app.ico `
             --runtime win-x64 `
             --releaseNotes artifacts/release-notes.md `
             --outputDir artifacts/Releases
