@@ -4,6 +4,8 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <Version>0.2.1</Version>
+    <AssemblyTitle>Bunny Desk</AssemblyTitle>
+    <Product>Bunny Desk</Product>
     <StartupObject>GeminiDesk.App</StartupObject>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

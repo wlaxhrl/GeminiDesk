@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:GeminiDesk"
         xmlns:mdxaml="clr-namespace:MdXaml;assembly=MdXaml"
-        Title="GeminiDesk"
+        Title="Bunny Desk"
         Width="1180"
         Height="760"
         MinWidth="900"
@@ -213,17 +213,17 @@
                                    VerticalAlignment="Center"
                                    FontSize="21"
                                    Foreground="White"
-                                   Text="✦" />
+                                   Text="🐇" />
                     </Border>
                     <StackPanel Margin="11,1,0,0">
                         <TextBlock FontSize="19"
                                    FontWeight="Bold"
                                    Foreground="{StaticResource InkBrush}"
-                                   Text="GeminiDesk" />
+                                   Text="Bunny Desk" />
                         <TextBlock Margin="0,2,0,0"
                                    FontSize="11"
                                    Foreground="{StaticResource MutedBrush}"
-                                   Text="나만의 작은 AI 공간" />
+                                   Text="여러 AI를 가볍게 폴짝" />
                     </StackPanel>
                 </StackPanel>
 
@@ -320,7 +320,7 @@
                                 DockPanel.Dock="Right"
                                 Height="28"
                                 Padding="10,2"
-                                AutomationProperties.Name="GeminiDesk 업데이트 확인"
+                                AutomationProperties.Name="Bunny Desk 업데이트 확인"
                                 Click="UpdateButton_Click"
                                 Content="업데이트 확인"
                                 FontSize="10"

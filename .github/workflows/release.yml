@@ -90,7 +90,7 @@ jobs:
             --packVersion ${{ steps.version.outputs.version }} `
             --packDir artifacts/publish `
             --mainExe GeminiDesk.exe `
-            --packTitle GeminiDesk `
+            --packTitle "Bunny Desk" `
             --packAuthors wlaxhrl `
             --runtime win-x64 `
             --releaseNotes artifacts/release-notes.md `

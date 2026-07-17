@@ -55,7 +55,7 @@ try {
         --packVersion $Version `
         --packDir $publishDir `
         --mainExe GeminiDesk.exe `
-        --packTitle GeminiDesk `
+        --packTitle 'Bunny Desk' `
         --packAuthors wlaxhrl `
         --runtime win-x64 `
         --outputDir $releaseDir

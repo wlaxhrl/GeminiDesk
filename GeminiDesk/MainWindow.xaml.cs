@@ -349,7 +349,7 @@ public partial class MainWindow : Window
 
                 if (showNoUpdateMessage)
                 {
-                    StatusText.Text = "GeminiDesk가 최신 버전이에요";
+                    StatusText.Text = "Bunny Desk가 최신 버전이에요";
                 }
 
                 return;
@@ -384,7 +384,7 @@ public partial class MainWindow : Window
     {
         var version = update.TargetFullRelease.Version;
         var answer = MessageBox.Show(
-            $"GeminiDesk v{version}을 내려받아 설치할까요?{System.Environment.NewLine}{System.Environment.NewLine}다운로드가 끝나면 앱이 자동으로 다시 시작돼요.",
+            $"Bunny Desk v{version}을 내려받아 설치할까요?{System.Environment.NewLine}{System.Environment.NewLine}다운로드가 끝나면 앱이 자동으로 다시 시작돼요.",
             "새 버전이 있어요 ✨",
             MessageBoxButton.YesNo,
             MessageBoxImage.Information);
