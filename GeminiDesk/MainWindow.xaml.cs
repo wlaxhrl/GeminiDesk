@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -12,6 +13,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
+using System.Windows.Threading;
 using Google.GenAI;
 using Google.GenAI.Types;
 using Microsoft.Win32;
@@ -62,6 +64,7 @@ public partial class MainWindow : Window
     private bool _isCheckingForUpdates;
     private bool _isDownloadingUpdate;
     private bool _notificationsEnabled = true;
+    private bool _scrollToLatestQueued;
 
     public ObservableCollection<ChatMessage> Messages { get; } = [];
     public ObservableCollection<ConversationSummary> Conversations { get; } = [];
@@ -1224,6 +1227,8 @@ public partial class MainWindow : Window
         }
         else if (model.Provider == ModelProvider.OpenAi)
         {
+            using var streamingText = new StreamingTextBuffer(modelMessage, ScrollToLatestMessage);
+
             await foreach (var chunk in _openAiResponsesService.StreamResponseAsync(
                                apiKey,
                                model,
@@ -1233,8 +1238,7 @@ public partial class MainWindow : Window
             {
                 if (!string.IsNullOrEmpty(chunk.TextDelta))
                 {
-                    modelMessage.Text += chunk.TextDelta;
-                    ScrollToLatestMessage();
+                    await streamingText.AppendAsync(chunk.TextDelta);
                 }
 
                 collectedSources.AddRange(chunk.Sources);
@@ -1246,6 +1250,8 @@ public partial class MainWindow : Window
         }
         else if (model.Provider == ModelProvider.Anthropic)
         {
+            using var streamingText = new StreamingTextBuffer(modelMessage, ScrollToLatestMessage);
+
             await foreach (var chunk in _anthropicMessagesService.StreamResponseAsync(
                                apiKey,
                                model,
@@ -1254,8 +1260,7 @@ public partial class MainWindow : Window
             {
                 if (!string.IsNullOrEmpty(chunk.TextDelta))
                 {
-                    modelMessage.Text += chunk.TextDelta;
-                    ScrollToLatestMessage();
+                    await streamingText.AppendAsync(chunk.TextDelta);
                 }
 
                 if (chunk.Usage is not null)
@@ -1266,6 +1271,7 @@ public partial class MainWindow : Window
         }
         else
         {
+            using var streamingText = new StreamingTextBuffer(modelMessage, ScrollToLatestMessage);
             var client = new Client(apiKey: apiKey);
             var config = WebSearchCheckBox.IsChecked == true
                 ? new GenerateContentConfig
@@ -1287,8 +1293,7 @@ public partial class MainWindow : Window
 
                 if (!string.IsNullOrEmpty(chunkText))
                 {
-                    modelMessage.Text += chunkText;
-                    ScrollToLatestMessage();
+                    await streamingText.AppendAsync(chunkText);
                 }
 
                 collectedSources.AddRange(ExtractSources(chunk));
@@ -2357,12 +2362,12 @@ public partial class MainWindow : Window
         _conversationHistory.Add(editedUserContent);
 
         modelMessage.CanRegenerate = false;
+        modelMessage.IsStreaming = true;
         modelMessage.Text = string.Empty;
         modelMessage.ModelId = requestModelId;
         modelMessage.RefreshModelDisplayName(requestModel.DisplayName);
         modelMessage.Sources = [];
         modelMessage.Attachments = [];
-        modelMessage.IsStreaming = true;
         _generationCancellation = new CancellationTokenSource();
         SetBusy(true);
         ScrollToLatestMessage();
@@ -2546,12 +2551,12 @@ public partial class MainWindow : Window
         _conversationHistory.RemoveAt(_conversationHistory.Count - 1);
 
         modelMessage.CanRegenerate = false;
+        modelMessage.IsStreaming = true;
         modelMessage.Text = string.Empty;
         modelMessage.ModelId = requestModelId;
         modelMessage.RefreshModelDisplayName(requestModel.DisplayName);
         modelMessage.Sources = [];
         modelMessage.Attachments = [];
-        modelMessage.IsStreaming = true;
         _generationCancellation = new CancellationTokenSource();
         SetBusy(true);
         ScrollToLatestMessage();
@@ -2713,7 +2718,78 @@ public partial class MainWindow : Window
 
     private void ScrollToLatestMessage()
     {
-        Dispatcher.BeginInvoke(() => ChatScrollViewer.ScrollToEnd());
+        if (_scrollToLatestQueued)
+        {
+            return;
+        }
+
+        _scrollToLatestQueued = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+        {
+            _scrollToLatestQueued = false;
+            ChatScrollViewer.ScrollToEnd();
+        });
+    }
+
+    private sealed class StreamingTextBuffer : IDisposable
+    {
+        private readonly ChatMessage _message;
+        private readonly Action _requestScroll;
+        private readonly StringBuilder _buffer;
+        private readonly Stopwatch _updateTimer = Stopwatch.StartNew();
+        private int _flushedLength;
+
+        public StreamingTextBuffer(ChatMessage message, Action requestScroll)
+        {
+            _message = message;
+            _requestScroll = requestScroll;
+            _buffer = new StringBuilder(message.Text);
+            _flushedLength = _buffer.Length;
+        }
+
+        public async ValueTask AppendAsync(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            _buffer.Append(text);
+
+            if (_flushedLength > 0 &&
+                _updateTimer.Elapsed < GetUpdateInterval(_buffer.Length))
+            {
+                return;
+            }
+
+            Flush();
+            await Dispatcher.Yield(DispatcherPriority.Background);
+        }
+
+        public void Flush()
+        {
+            if (_flushedLength == _buffer.Length)
+            {
+                return;
+            }
+
+            _message.Text = _buffer.ToString();
+            _flushedLength = _buffer.Length;
+            _updateTimer.Restart();
+            _requestScroll();
+        }
+
+        public void Dispose()
+        {
+            Flush();
+        }
+
+        private static TimeSpan GetUpdateInterval(int textLength) => textLength switch
+        {
+            < 12_000 => TimeSpan.FromMilliseconds(75),
+            < 40_000 => TimeSpan.FromMilliseconds(125),
+            _ => TimeSpan.FromMilliseconds(250)
+        };
     }
 
     private void NotifyReplyCompletedIfNeeded()
@@ -2788,6 +2864,7 @@ public sealed record UsageDisplayItem(
 public sealed class ChatMessage : INotifyPropertyChanged
 {
     private string _text;
+    private string _renderedMarkdown;
     private string _editText;
     private string? _modelId;
     private string _modelDisplayName;
@@ -2806,6 +2883,7 @@ public sealed class ChatMessage : INotifyPropertyChanged
         string? modelId = null)
     {
         _text = text;
+        _renderedMarkdown = text;
         _editText = text;
         _modelId = modelId;
         _modelDisplayName = GetDefaultModelDisplayName(modelId);
@@ -2826,8 +2904,15 @@ public sealed class ChatMessage : INotifyPropertyChanged
 
             _text = value;
             OnPropertyChanged();
+
+            if (!_isStreaming)
+            {
+                RefreshRenderedMarkdown();
+            }
         }
     }
+
+    public string RenderedMarkdown => _renderedMarkdown;
 
     public bool IsUser { get; }
 
@@ -2935,8 +3020,25 @@ public sealed class ChatMessage : INotifyPropertyChanged
             }
 
             _isStreaming = value;
+
+            if (!_isStreaming)
+            {
+                RefreshRenderedMarkdown();
+            }
+
             OnPropertyChanged();
         }
+    }
+
+    private void RefreshRenderedMarkdown()
+    {
+        if (_renderedMarkdown == _text)
+        {
+            return;
+        }
+
+        _renderedMarkdown = _text;
+        OnPropertyChanged(nameof(RenderedMarkdown));
     }
 
     public bool IsEditing
