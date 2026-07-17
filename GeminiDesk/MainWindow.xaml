@@ -1637,7 +1637,7 @@
                                        FontSize="11"
                                        Foreground="{StaticResource MutedBrush}"
                                        LineHeight="19"
-                                       Text="추론 강도를 최대로 설정해 두었어요."
+                                       Text="추론 강도는 모델 기본값에 맡겨져 있어요. 추론을 많이 하는 모델이라 예상보다 비싸게 나올 수 있고, 오히려 GPT Sol Flex가 더 저렴할 때도 있어요. 직접 테스트하면서 비용 감을 익혀보세요."
                                        TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
