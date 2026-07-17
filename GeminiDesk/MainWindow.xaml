@@ -1048,8 +1048,9 @@
                                                Foreground="{StaticResource InkBrush}"
                                                Text="다른 PC로 키 옮기기" />
                                     <TextBlock Margin="0,3,0,0" FontSize="10.5"
-                                               Foreground="{StaticResource MutedBrush}"
-                                               Text="비밀번호로 잠근 .bunnykeys 파일을 만들거나 불러와요."
+                                               FontWeight="SemiBold"
+                                               Foreground="#FFC0475D"
+                                               Text="⚠ 암호화되지 않아요. 파일을 가진 사람은 API 키를 볼 수 있어요."
                                                TextWrapping="Wrap" />
                                 </StackPanel>
                             </DockPanel>

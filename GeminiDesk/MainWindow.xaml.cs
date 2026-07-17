@@ -628,20 +628,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        var passwordDialog = new KeyPresetPasswordDialog(requiresConfirmation: true)
-        {
-            Owner = this
-        };
-
-        if (passwordDialog.ShowDialog() != true)
-        {
-            return;
-        }
-
         try
         {
-            KeyPresetService.Save(fileDialog.FileName, apiKeys, passwordDialog.PresetPassword);
-            ApiKeySettingsNotice.Text = $"API 키 {apiKeys.Count}개를 암호화된 프리셋 파일로 저장했어요 ✓";
+            KeyPresetService.Save(fileDialog.FileName, apiKeys);
+            ApiKeySettingsNotice.Text = $"API 키 {apiKeys.Count}개를 프리셋 파일로 저장했어요. 파일을 안전하게 보관해 주세요!";
         }
         catch (Exception exception)
         {
@@ -668,19 +658,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        var passwordDialog = new KeyPresetPasswordDialog(requiresConfirmation: false)
-        {
-            Owner = this
-        };
-
-        if (passwordDialog.ShowDialog() != true)
-        {
-            return;
-        }
-
         try
         {
-            var importedKeys = KeyPresetService.Load(fileDialog.FileName, passwordDialog.PresetPassword);
+            var importedKeys = KeyPresetService.Load(fileDialog.FileName);
             var importedCount = 0;
 
             foreach (var (provider, apiKeyValue) in importedKeys)
