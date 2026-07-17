@@ -60,29 +60,28 @@
 
         <Grid>
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock FontSize="25"
-                               FontWeight="Bold"
-                               Foreground="{StaticResource InkBrush}"
-                               Text="구독과 비교하기" />
-                    <Image Width="32"
-                           Height="32"
-                           Margin="8,-2,0,0"
-                           VerticalAlignment="Center"
-                           Stretch="Uniform"
-                           Source="/GeminiDesk;component/Assets/bunny-mascot.png" />
-                </StackPanel>
+            <Image Width="100"
+                   Height="100"
+                   Margin="0,0,17,0"
+                   VerticalAlignment="Center"
+                   Stretch="Uniform"
+                   Source="/GeminiDesk;component/Assets/bunny-mascot.png" />
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock FontSize="25"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource InkBrush}"
+                           Text="구독과 비교하기" />
                 <TextBlock x:Name="ComparisonMonthText"
                            Margin="1,6,0,0"
                            FontSize="12"
                            Foreground="{StaticResource MutedBrush}"
                            Text="2026년 7월 사용량 기준" />
             </StackPanel>
-            <Border Grid.Column="1"
+            <Border Grid.Column="2"
                     Padding="13,7"
                     VerticalAlignment="Center"
                     Background="{StaticResource PrimarySoftBrush}"
