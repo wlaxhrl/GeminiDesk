@@ -606,7 +606,7 @@
                                                                                   FontSize="15.5"
                                                                                   Foreground="{StaticResource InkBrush}"
                                                                                   HorizontalScrollBarVisibility="Disabled"
-                                                                                  Markdown="{Binding RenderedMarkdown}"
+                                                                                  SourceMarkdown="{Binding RenderedMarkdown}"
                                                                                   VerticalScrollBarVisibility="Disabled"
                                                                                   Visibility="Collapsed" />
 
