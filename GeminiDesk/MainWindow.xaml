@@ -206,7 +206,6 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <StackPanel Orientation="Horizontal" Margin="2,4,0,20">
@@ -316,15 +315,7 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
 
-                <Button x:Name="DeleteChatButton"
-                        Grid.Row="6"
-                        Height="36"
-                        Margin="0,12,0,0"
-                        Style="{StaticResource DangerButton}"
-                        Click="DeleteChatButton_Click"
-                        Content="선택한 대화 삭제" />
-
-                <StackPanel Grid.Row="7" Margin="2,10,2,0">
+                <StackPanel Grid.Row="6" Margin="2,10,2,0">
                     <DockPanel LastChildFill="False">
                         <TextBlock x:Name="VersionText"
                                    VerticalAlignment="Center"

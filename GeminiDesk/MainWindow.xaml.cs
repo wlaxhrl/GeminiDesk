@@ -1429,11 +1429,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void DeleteChatButton_Click(object sender, RoutedEventArgs e)
-    {
-        DeleteSelectedConversation();
-    }
-
     private void ConversationList_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (System.Windows.Controls.ItemsControl.ContainerFromElement(
@@ -2477,7 +2472,6 @@ public partial class MainWindow : Window
         SendButton.Content = isBusy ? "중지" : "보내기";
         NewChatButton.IsEnabled = !isBusy && !isEditing;
         ConversationList.IsEnabled = !isBusy && !isEditing;
-        DeleteChatButton.IsEnabled = !isBusy && !isEditing;
         AttachButton.IsEnabled = !isBusy && !isEditing;
         ClearAttachmentsButton.IsEnabled = !isBusy && !isEditing && _attachments.Count > 0;
         var selectedModel = GetSelectedModel();
