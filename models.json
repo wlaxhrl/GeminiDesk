@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "models": [
     {
       "id": "gemini-3.5-flash",
@@ -95,7 +95,7 @@
       "shortName": "Opus 4.6",
       "icon": "✺",
       "badge": "OPUS",
-      "description": "가장 똑똑한 Claude · 복잡한 추론과 글쓰기에 강해요",
+      "description": "공감형 감성친구, 추론과 글쓰기에 강해요.",
       "requiresBilling": true,
       "reasoningEffort": "high"
     }

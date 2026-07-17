@@ -39,7 +39,7 @@ public sealed record AiModelOption
 
 public static class ModelCatalogService
 {
-    private const int CurrentSchemaVersion = 5;
+    private const int CurrentSchemaVersion = 6;
     private const string RemoteCatalogUrl =
         "https://raw.githubusercontent.com/wlaxhrl/GeminiDesk/main/models.json";
 
@@ -248,7 +248,7 @@ public static class ModelCatalogService
                 ShortName = "Opus 4.6",
                 Icon = "✺",
                 Badge = "OPUS",
-                Description = "가장 똑똑한 Claude · 복잡한 추론과 글쓰기에 강해요",
+                Description = "공감형 감성친구, 추론과 글쓰기에 강해요.",
                 RequiresBilling = true,
                 ReasoningEffort = "high"
             }
