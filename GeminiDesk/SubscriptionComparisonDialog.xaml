@@ -8,7 +8,7 @@
         MinHeight="620"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
-        FontFamily="Segoe UI Variable Text, Malgun Gothic"
+        FontFamily="Segoe UI Variable Text, Segoe UI Emoji, Malgun Gothic"
         Background="#FFF8F7FC">
     <Window.Resources>
         <SolidColorBrush x:Key="InkBrush" Color="#FF29263B" />

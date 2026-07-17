@@ -75,7 +75,8 @@ public sealed class ReadableMarkdownViewer : MarkdownScrollViewer
         }
 
         Document.PagePadding = new Thickness(0);
-        Document.FontFamily = new System.Windows.Media.FontFamily("Segoe UI Variable Text, Malgun Gothic");
+        Document.FontFamily = new System.Windows.Media.FontFamily(
+            "Segoe UI Variable Text, Segoe UI Emoji, Malgun Gothic");
         Document.FontSize = 15.5;
         Document.LineHeight = 30;
         Document.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;

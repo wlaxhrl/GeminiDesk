@@ -9,7 +9,7 @@
         MinWidth="900"
         MinHeight="620"
         WindowStartupLocation="CenterScreen"
-        FontFamily="Segoe UI Variable Text, Malgun Gothic"
+        FontFamily="Segoe UI Variable Text, Segoe UI Emoji, Malgun Gothic"
         Background="#FFF8F7FC">
     <Window.Resources>
         <local:AttachmentPreviewConverter x:Key="AttachmentPreviewConverter" />
@@ -77,7 +77,7 @@
         </Style>
 
         <Style TargetType="{x:Type Paragraph}">
-            <Setter Property="FontFamily" Value="Segoe UI Variable Text, Malgun Gothic" />
+            <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI Emoji, Malgun Gothic" />
             <Setter Property="FontSize" Value="15" />
             <Setter Property="LineHeight" Value="30" />
             <Setter Property="Margin" Value="0,3,0,15" />
@@ -442,7 +442,7 @@
                                            Text="⚡" />
                                 <TextBlock x:Name="SelectedModelName"
                                            VerticalAlignment="Center"
-                                           FontFamily="Segoe UI Variable Text, Malgun Gothic"
+                                           FontFamily="Segoe UI Variable Text, Segoe UI Emoji, Malgun Gothic"
                                            FontSize="12"
                                            FontWeight="SemiBold"
                                            Text="3.5 Flash" />
@@ -540,7 +540,7 @@
                                                                 MinWidth="240"
                                                                 AutomationProperties.Name="AI 답변 준비 중"
                                                                 Visibility="Collapsed">
-                                                        <TextBlock FontFamily="Segoe UI Variable Text, Malgun Gothic"
+                                                        <TextBlock FontFamily="Segoe UI Variable Text, Segoe UI Emoji, Malgun Gothic"
                                                                    FontSize="13"
                                                                    FontWeight="SemiBold"
                                                                    Foreground="#FF655AA8"
@@ -557,7 +557,7 @@
                                                              Background="Transparent"
                                                              BorderThickness="0"
                                                              Cursor="IBeam"
-                                                             FontFamily="Segoe UI Variable Text, Malgun Gothic"
+                                                             FontFamily="Segoe UI Variable Text, Segoe UI Emoji, Malgun Gothic"
                                                              FontSize="15.5"
                                                              IsReadOnly="True"
                                                              IsReadOnlyCaretVisible="False"
@@ -572,7 +572,7 @@
                                                                  MinHeight="86"
                                                                  MaxHeight="260"
                                                                  AcceptsReturn="True"
-                                                                 FontFamily="Segoe UI Variable Text, Malgun Gothic"
+                                                                 FontFamily="Segoe UI Variable Text, Segoe UI Emoji, Malgun Gothic"
                                                                  FontSize="15.5"
                                                                  IsVisibleChanged="EditMessageBox_IsVisibleChanged"
                                                                  Text="{Binding EditText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -602,7 +602,7 @@
                                                     <local:ReadableMarkdownViewer x:Name="MarkdownMessage"
                                                                                   Background="Transparent"
                                                                                   BorderThickness="0"
-                                                                                  FontFamily="Segoe UI Variable Text, Malgun Gothic"
+                                                                                  FontFamily="Segoe UI Variable Text, Segoe UI Emoji, Malgun Gothic"
                                                                                   FontSize="15.5"
                                                                                   Foreground="{StaticResource InkBrush}"
                                                                                   HorizontalScrollBarVisibility="Disabled"
@@ -765,7 +765,7 @@
                                                                    Foreground="{StaticResource PrimaryBrush}"
                                                                    Text="✦" />
                                                         <TextBlock x:Name="ResponseModelName"
-                                                                   FontFamily="Segoe UI Variable Text, Malgun Gothic"
+                                                                   FontFamily="Segoe UI Variable Text, Segoe UI Emoji, Malgun Gothic"
                                                                    FontSize="10"
                                                                    FontWeight="SemiBold"
                                                                    Foreground="#FF5D51C6"
@@ -889,7 +889,7 @@
                              MaxHeight="160"
                              Style="{StaticResource RoundedTextBox}"
                              AcceptsReturn="True"
-                             FontFamily="Segoe UI Variable Text, Malgun Gothic"
+                             FontFamily="Segoe UI Variable Text, Segoe UI Emoji, Malgun Gothic"
                              FontSize="15"
                              PreviewKeyDown="PromptBox_PreviewKeyDown"
                              TextBlock.LineHeight="26"
