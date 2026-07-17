@@ -1027,6 +1027,51 @@
                             </StackPanel>
                         </Grid>
                     </Border>
+
+                    <Border Margin="0,12,0,0"
+                            Padding="17"
+                            Background="{StaticResource PinkSoftBrush}"
+                            CornerRadius="19">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <DockPanel>
+                                <Border Width="42" Height="42" Margin="0,0,14,0"
+                                        Background="White" CornerRadius="13">
+                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               FontSize="18" Text="🧳" />
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock FontSize="15" FontWeight="Bold"
+                                               Foreground="{StaticResource InkBrush}"
+                                               Text="다른 PC로 키 옮기기" />
+                                    <TextBlock Margin="0,3,0,0" FontSize="10.5"
+                                               Foreground="{StaticResource MutedBrush}"
+                                               Text="비밀번호로 잠근 .bunnykeys 파일을 만들거나 불러와요."
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </DockPanel>
+                            <StackPanel Grid.Row="1"
+                                        Margin="56,13,0,0"
+                                        Orientation="Horizontal">
+                                <Button x:Name="ExportKeyPresetButton"
+                                        Height="36"
+                                        Padding="13,5"
+                                        Style="{StaticResource PillButton}"
+                                        Click="ExportKeyPresetButton_Click"
+                                        Content="파일로 저장" />
+                                <Button x:Name="ImportKeyPresetButton"
+                                        Height="36"
+                                        Margin="8,0,0,0"
+                                        Padding="13,5"
+                                        Style="{StaticResource SoftButton}"
+                                        Click="ImportKeyPresetButton_Click"
+                                        Content="프리셋 불러오기" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
                 </StackPanel>
 
                 <Grid Grid.Row="3" Margin="2,16,2,4">

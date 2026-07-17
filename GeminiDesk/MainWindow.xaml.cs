@@ -601,6 +601,152 @@ public partial class MainWindow : Window
             MessageBoxImage.Warning);
     }
 
+    private void ExportKeyPresetButton_Click(object sender, RoutedEventArgs e)
+    {
+        var apiKeys = GetApiKeysFromSettingsFields();
+        if (apiKeys.Count == 0)
+        {
+            MessageBox.Show(
+                "프리셋에 담을 API 키를 하나 이상 입력해 주세요.",
+                "저장할 키 없음",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var fileDialog = new SaveFileDialog
+        {
+            Title = "Bunny Desk 키 프리셋 저장",
+            FileName = $"BunnyDesk-keys-{DateTime.Now:yyyyMMdd}.bunnykeys",
+            DefaultExt = ".bunnykeys",
+            AddExtension = true,
+            Filter = "Bunny Desk 키 프리셋|*.bunnykeys"
+        };
+
+        if (fileDialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        var passwordDialog = new KeyPresetPasswordDialog(requiresConfirmation: true)
+        {
+            Owner = this
+        };
+
+        if (passwordDialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            KeyPresetService.Save(fileDialog.FileName, apiKeys, passwordDialog.PresetPassword);
+            ApiKeySettingsNotice.Text = $"API 키 {apiKeys.Count}개를 암호화된 프리셋 파일로 저장했어요 ✓";
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                $"키 프리셋 파일을 저장하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                "프리셋 저장 오류",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void ImportKeyPresetButton_Click(object sender, RoutedEventArgs e)
+    {
+        var fileDialog = new OpenFileDialog
+        {
+            Title = "Bunny Desk 키 프리셋 불러오기",
+            DefaultExt = ".bunnykeys",
+            CheckFileExists = true,
+            Filter = "Bunny Desk 키 프리셋|*.bunnykeys|모든 파일|*.*"
+        };
+
+        if (fileDialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        var passwordDialog = new KeyPresetPasswordDialog(requiresConfirmation: false)
+        {
+            Owner = this
+        };
+
+        if (passwordDialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var importedKeys = KeyPresetService.Load(fileDialog.FileName, passwordDialog.PresetPassword);
+            var importedCount = 0;
+
+            foreach (var (provider, apiKeyValue) in importedKeys)
+            {
+                var apiKey = NormalizeApiKey(apiKeyValue);
+                if (string.IsNullOrWhiteSpace(apiKey))
+                {
+                    continue;
+                }
+
+                GetApiKeyBox(provider).Password = apiKey;
+                MarkApiKeyAsImported(provider);
+                importedCount++;
+            }
+
+            if (importedCount == 0)
+            {
+                throw new InvalidDataException("불러올 수 있는 API 키가 없습니다.");
+            }
+
+            ApiKeySettingsNotice.Text = $"프리셋에서 API 키 {importedCount}개를 채웠어요. ‘모두 저장하기’를 눌러 이 PC에 저장해 주세요.";
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                $"키 프리셋을 불러오지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                "프리셋 불러오기 오류",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private Dictionary<string, string> GetApiKeysFromSettingsFields()
+    {
+        var apiKeys = new Dictionary<string, string>(StringComparer.Ordinal);
+        var entries = new (string Provider, PasswordBox Input)[]
+        {
+            (ModelProvider.Google, GeminiApiKeyBox),
+            (ModelProvider.OpenAi, OpenAiApiKeyBox),
+            (ModelProvider.Anthropic, AnthropicApiKeyBox)
+        };
+
+        foreach (var (provider, input) in entries)
+        {
+            var apiKey = NormalizeApiKey(input.Password);
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                apiKeys[provider] = apiKey;
+            }
+        }
+
+        return apiKeys;
+    }
+
+    private void MarkApiKeyAsImported(string provider)
+    {
+        var statusText = provider switch
+        {
+            ModelProvider.OpenAi => OpenAiApiKeyStatusText,
+            ModelProvider.Anthropic => AnthropicApiKeyStatusText,
+            _ => GeminiApiKeyStatusText
+        };
+        statusText.Text = "● 불러옴 · 저장 전";
+        statusText.Foreground = (System.Windows.Media.Brush)FindResource("PrimaryBrush");
+    }
+
     private bool TryGetApiKeyForProvider(string provider, out string apiKey)
     {
         apiKey = NormalizeApiKey(_apiKeys.GetValueOrDefault(provider, string.Empty));
@@ -2090,6 +2236,8 @@ public partial class MainWindow : Window
         OpenAiApiKeyBox.IsEnabled = !isBusy;
         AnthropicApiKeyBox.IsEnabled = !isBusy;
         SaveAllApiKeysButton.IsEnabled = !isBusy;
+        ExportKeyPresetButton.IsEnabled = !isBusy;
+        ImportKeyPresetButton.IsEnabled = !isBusy;
         PromptBox.IsEnabled = !isBusy && !isEditing;
 
         if (isBusy)
