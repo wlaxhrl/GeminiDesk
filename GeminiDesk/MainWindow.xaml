@@ -22,6 +22,60 @@
         <SolidColorBrush x:Key="BorderBrush" Color="#FFE9E5F1" />
         <SolidColorBrush x:Key="CardBrush" Color="#FFFFFFFF" />
 
+        <Style x:Key="SlimScrollBar" TargetType="ScrollBar">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="MinWidth" Value="8" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Width="8" Background="Transparent">
+                            <Track x:Name="PART_Track"
+                                   Focusable="False"
+                                   IsDirectionReversed="True"
+                                   Orientation="Vertical">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                                  Focusable="False"
+                                                  Opacity="0" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb MinHeight="28"
+                                           Margin="1,0"
+                                           Cursor="Hand">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border x:Name="ThumbBody"
+                                                        Background="#707567E8"
+                                                        CornerRadius="3" />
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="ThumbBody"
+                                                                Property="Background"
+                                                                Value="#B07567E8" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="ThumbBody"
+                                                                Property="Background"
+                                                                Value="#DD7567E8" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                                  Focusable="False"
+                                                  Opacity="0" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="{x:Type Paragraph}">
             <Setter Property="FontFamily" Value="Segoe UI Variable Text, Malgun Gothic" />
             <Setter Property="FontSize" Value="15" />
@@ -272,59 +326,7 @@
                          VirtualizingPanel.IsVirtualizing="True"
                          VirtualizingPanel.VirtualizationMode="Recycling">
                     <ListBox.Resources>
-                        <Style TargetType="ScrollBar">
-                            <Setter Property="Width" Value="8" />
-                            <Setter Property="MinWidth" Value="8" />
-                            <Setter Property="Background" Value="Transparent" />
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ScrollBar">
-                                        <Grid Width="8" Background="Transparent">
-                                            <Track x:Name="PART_Track"
-                                                   Focusable="False"
-                                                   IsDirectionReversed="True"
-                                                   Orientation="Vertical">
-                                                <Track.DecreaseRepeatButton>
-                                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
-                                                                  Focusable="False"
-                                                                  Opacity="0" />
-                                                </Track.DecreaseRepeatButton>
-                                                <Track.Thumb>
-                                                    <Thumb MinHeight="28"
-                                                           Margin="1,0"
-                                                           Cursor="Hand">
-                                                        <Thumb.Template>
-                                                            <ControlTemplate TargetType="Thumb">
-                                                                <Border x:Name="ThumbBody"
-                                                                        Background="#707567E8"
-                                                                        CornerRadius="3" />
-                                                                <ControlTemplate.Triggers>
-                                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                                        <Setter TargetName="ThumbBody"
-                                                                                Property="Background"
-                                                                                Value="#B07567E8" />
-                                                                    </Trigger>
-                                                                    <Trigger Property="IsDragging" Value="True">
-                                                                        <Setter TargetName="ThumbBody"
-                                                                                Property="Background"
-                                                                                Value="#DD7567E8" />
-                                                                    </Trigger>
-                                                                </ControlTemplate.Triggers>
-                                                            </ControlTemplate>
-                                                        </Thumb.Template>
-                                                    </Thumb>
-                                                </Track.Thumb>
-                                                <Track.IncreaseRepeatButton>
-                                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
-                                                                  Focusable="False"
-                                                                  Opacity="0" />
-                                                </Track.IncreaseRepeatButton>
-                                            </Track>
-                                        </Grid>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
+                        <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimScrollBar}" />
                     </ListBox.Resources>
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
@@ -485,6 +487,9 @@
                             CornerRadius="17">
                         <ScrollViewer x:Name="ChatScrollViewer"
                                       VerticalScrollBarVisibility="Auto">
+                            <ScrollViewer.Resources>
+                                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimScrollBar}" />
+                            </ScrollViewer.Resources>
                             <ItemsControl x:Name="ChatMessages" ItemsSource="{Binding Messages}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
