@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     private const string LegacySolModelId = "gpt-5.6-sol";
     private const string StandardSolModelId = "gpt-5.6-sol-standard";
     private const string SelectedModelSettingKey = "selected-model";
+    private const int ConversationPageSize = 10;
     private const long MaxFileSize = 10 * 1024 * 1024;
     private const long MaxTotalAttachmentSize = 20 * 1024 * 1024;
     private readonly List<Content> _conversationHistory = [];
@@ -53,6 +54,8 @@ public partial class MainWindow : Window
     private string? _currentConversationId;
     private string _selectedModelId = DefaultModelId;
     private DateTime _usageMonth = new(DateTime.Now.Year, DateTime.Now.Month, 1);
+    private bool _hasMoreConversations = true;
+    private bool _isLoadingConversations;
     private bool _isUpdatingConversationSelection;
     private bool _isCheckingForUpdates;
     private bool _isDownloadingUpdate;
@@ -1400,6 +1403,32 @@ public partial class MainWindow : Window
         LoadConversation(conversation.Id);
     }
 
+    private void ConversationList_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (e.OriginalSource is ScrollViewer scrollViewer &&
+            scrollViewer.ScrollableHeight > 0 &&
+            scrollViewer.VerticalOffset >= scrollViewer.ScrollableHeight - 24)
+        {
+            LoadMoreConversations();
+        }
+    }
+
+    private void ConversationList_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (e.Delta >= 0)
+        {
+            return;
+        }
+
+        var scrollViewer = FindVisualChild<ScrollViewer>(ConversationList);
+        if (scrollViewer is null ||
+            scrollViewer.ScrollableHeight <= 0 ||
+            scrollViewer.VerticalOffset >= scrollViewer.ScrollableHeight - 24)
+        {
+            LoadMoreConversations();
+        }
+    }
+
     private void DeleteChatButton_Click(object sender, RoutedEventArgs e)
     {
         DeleteSelectedConversation();
@@ -1560,16 +1589,68 @@ public partial class MainWindow : Window
     private void RefreshConversations()
     {
         var selectedId = _currentConversationId;
+        var requestedCount = Math.Max(ConversationPageSize, Conversations.Count);
         _isUpdatingConversationSelection = true;
         Conversations.Clear();
+        _hasMoreConversations = true;
 
-        foreach (var conversation in _chatStore.GetConversations())
-        {
-            Conversations.Add(conversation);
-        }
+        LoadMoreConversations(requestedCount);
 
         ConversationList.SelectedItem = Conversations.FirstOrDefault(item => item.Id == selectedId);
         _isUpdatingConversationSelection = false;
+    }
+
+    private void LoadMoreConversations(int count = ConversationPageSize)
+    {
+        if (_isLoadingConversations || !_hasMoreConversations || count <= 0)
+        {
+            return;
+        }
+
+        _isLoadingConversations = true;
+
+        try
+        {
+            var page = _chatStore.GetConversations(
+                count + 1,
+                Conversations.LastOrDefault());
+
+            foreach (var conversation in page.Take(count))
+            {
+                Conversations.Add(conversation);
+            }
+
+            _hasMoreConversations = page.Count > count;
+        }
+        catch
+        {
+            _hasMoreConversations = false;
+            StatusText.Text = "대화 목록을 더 불러오지 못했어요";
+        }
+        finally
+        {
+            _isLoadingConversations = false;
+        }
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (var index = 0; index < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); index++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, index);
+            if (child is T match)
+            {
+                return match;
+            }
+
+            var descendant = FindVisualChild<T>(child);
+            if (descendant is not null)
+            {
+                return descendant;
+            }
+        }
+
+        return null;
     }
 
     private static string CreateConversationTitle(string prompt, IReadOnlyList<AttachmentItem> attachments)

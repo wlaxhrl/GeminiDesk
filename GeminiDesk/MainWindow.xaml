@@ -257,14 +257,6 @@
                                FontWeight="SemiBold"
                                Foreground="{StaticResource MutedBrush}"
                                Text="최근 대화" />
-                    <Border DockPanel.Dock="Right"
-                            Padding="7,2"
-                            Background="#88FFFFFF"
-                            CornerRadius="8">
-                        <TextBlock FontSize="10"
-                                   Foreground="{StaticResource MutedBrush}"
-                                   Text="LOCAL" />
-                    </Border>
                 </DockPanel>
 
                 <ListBox x:Name="ConversationList"
@@ -272,9 +264,14 @@
                          ItemsSource="{Binding Conversations}"
                          Background="Transparent"
                          BorderThickness="0"
+                         PreviewMouseWheel="ConversationList_PreviewMouseWheel"
                          PreviewMouseRightButtonDown="ConversationList_PreviewMouseRightButtonDown"
                          SelectionChanged="ConversationList_SelectionChanged"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.ScrollChanged="ConversationList_ScrollChanged"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch" />

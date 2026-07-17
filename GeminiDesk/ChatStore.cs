@@ -147,15 +147,41 @@ public sealed class ChatStore
         return records;
     }
 
-    public IReadOnlyList<ConversationSummary> GetConversations()
+    public IReadOnlyList<ConversationSummary> GetConversations(
+        int limit,
+        ConversationSummary? before = null)
     {
+        if (limit <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(limit));
+        }
+
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT Id, Title, UpdatedAtUtc
-            FROM Conversations
-            ORDER BY UpdatedAtUtc DESC;
-            """;
+        command.CommandText = before is null
+            ? """
+                SELECT Id, Title, UpdatedAtUtc
+                FROM Conversations
+                ORDER BY UpdatedAtUtc DESC, Id DESC
+                LIMIT $limit;
+                """
+            : """
+                SELECT Id, Title, UpdatedAtUtc
+                FROM Conversations
+                WHERE UpdatedAtUtc < $beforeUpdatedAtUtc
+                   OR (UpdatedAtUtc = $beforeUpdatedAtUtc AND Id < $beforeId)
+                ORDER BY UpdatedAtUtc DESC, Id DESC
+                LIMIT $limit;
+                """;
+        command.Parameters.AddWithValue("$limit", limit);
+
+        if (before is not null)
+        {
+            command.Parameters.AddWithValue(
+                "$beforeUpdatedAtUtc",
+                before.UpdatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue("$beforeId", before.Id);
+        }
 
         using var reader = command.ExecuteReader();
         var conversations = new List<ConversationSummary>();
@@ -595,6 +621,8 @@ public sealed class ChatStore
             );
 
             CREATE INDEX IF NOT EXISTS IX_Messages_ConversationId ON Messages(ConversationId);
+            CREATE INDEX IF NOT EXISTS IX_Conversations_UpdatedAtUtc_Id
+                ON Conversations(UpdatedAtUtc DESC, Id DESC);
             CREATE INDEX IF NOT EXISTS IX_Attachments_MessageId ON Attachments(MessageId);
             CREATE INDEX IF NOT EXISTS IX_Sources_MessageId ON Sources(MessageId);
             CREATE INDEX IF NOT EXISTS IX_UsageRecords_OccurredAtUtc ON UsageRecords(OccurredAtUtc);
