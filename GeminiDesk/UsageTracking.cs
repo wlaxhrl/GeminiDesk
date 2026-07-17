@@ -78,11 +78,19 @@ internal static class UsageMetadataMapper
 
 internal static class UsagePriceCalculator
 {
-    public const double UsdToKrw = 1400d;
+    public const double FallbackUsdToKrw = 1400d;
     public const string PricingVersion = "2026-07-17";
 
-    public static UsageRecord CreateRecord(AiModelOption model, AiRequestUsage usage)
+    public static UsageRecord CreateRecord(
+        AiModelOption model,
+        AiRequestUsage usage,
+        double usdToKrw = FallbackUsdToKrw)
     {
+        if (!double.IsFinite(usdToKrw) || usdToKrw <= 0)
+        {
+            usdToKrw = FallbackUsdToKrw;
+        }
+
         var estimatedUsd = Math.Max(0, CalculateUsd(model, usage));
         return new UsageRecord(
             0,
@@ -92,8 +100,8 @@ internal static class UsagePriceCalculator
             model.DisplayName,
             usage,
             estimatedUsd,
-            UsdToKrw,
-            estimatedUsd * UsdToKrw,
+            usdToKrw,
+            estimatedUsd * usdToKrw,
             PricingVersion);
     }
 

@@ -46,6 +46,7 @@ public partial class MainWindow : Window
     private readonly ImageGenerationService _imageGenerationService = new();
     private readonly AppUpdateService _appUpdateService = new();
     private readonly ChatStore _chatStore;
+    private readonly ExchangeRateService _exchangeRateService;
     private CancellationTokenSource? _generationCancellation;
     private UpdateInfo? _availableUpdate;
     private ChatMessage? _editingUserMessage;
@@ -74,6 +75,7 @@ public partial class MainWindow : Window
 
         LoadRememberedApiKeys();
         _chatStore = new ChatStore();
+        _exchangeRateService = new ExchangeRateService(_chatStore);
         _modelOptions.AddRange(ModelCatalogService.LoadInitialCatalog());
         LoadSelectedModel();
         _chatStore.CleanupOrphanedAttachments(TimeSpan.FromDays(7));
@@ -107,6 +109,7 @@ public partial class MainWindow : Window
         PromptBox.Focus();
         await Task.WhenAll(
             RefreshModelCatalogAsync(),
+            RefreshExchangeRateAsync(),
             CheckForUpdatesAsync(showNoUpdateMessage: false));
     }
 
@@ -494,9 +497,10 @@ public partial class MainWindow : Window
         ShowApiKeySettings();
     }
 
-    private void UsageButton_Click(object sender, RoutedEventArgs e)
+    private async void UsageButton_Click(object sender, RoutedEventArgs e)
     {
         ShowUsageView();
+        await RefreshExchangeRateAsync();
     }
 
     private void BackToChatButton_Click(object sender, RoutedEventArgs e)
@@ -533,6 +537,29 @@ public partial class MainWindow : Window
         ApiKeySettingsView.Visibility = Visibility.Collapsed;
         UsageView.Visibility = Visibility.Visible;
         RefreshUsageView();
+    }
+
+    private async Task RefreshExchangeRateAsync()
+    {
+        var snapshot = await _exchangeRateService.GetUsdToKrwAsync();
+        UsageExchangeRateText.Text = FormatExchangeRateLabel(snapshot);
+    }
+
+    private static string FormatExchangeRateLabel(ExchangeRateSnapshot snapshot)
+    {
+        var formattedRate = snapshot.UsdToKrw.ToString("N2", CultureInfo.GetCultureInfo("ko-KR"));
+
+        if (snapshot.IsDefault)
+        {
+            return $"환율 조회 실패 · 임시 기준 $1 = ₩{formattedRate}";
+        }
+
+        var dateLabel = snapshot.ReferenceDate?.ToString(
+            "M월 d일",
+            CultureInfo.GetCultureInfo("ko-KR")) ?? "최근";
+        return snapshot.IsStale
+            ? $"마지막 ECB {dateLabel} 기준 · $1 = ₩{formattedRate}"
+            : $"ECB {dateLabel} 기준 · $1 = ₩{formattedRate}";
     }
 
     private void PreviousUsageMonthButton_Click(object sender, RoutedEventArgs e)
@@ -990,7 +1017,7 @@ public partial class MainWindow : Window
                 requestModel,
                 requestContents,
                 _generationCancellation.Token);
-            SaveUsageEstimate(requestModel, usage);
+            await SaveUsageEstimateAsync(requestModel, usage);
 
             CompleteExchange(userContent, userMessage, modelMessage, prompt, attachments, "응답 완료 · 저장됨");
         }
@@ -1159,11 +1186,15 @@ public partial class MainWindow : Window
         return requestUsage;
     }
 
-    private void SaveUsageEstimate(AiModelOption model, AiRequestUsage usage)
+    private async Task SaveUsageEstimateAsync(AiModelOption model, AiRequestUsage usage)
     {
         try
         {
-            _chatStore.SaveUsage(UsagePriceCalculator.CreateRecord(model, usage));
+            var exchangeRate = await _exchangeRateService.GetUsdToKrwAsync();
+            _chatStore.SaveUsage(UsagePriceCalculator.CreateRecord(
+                model,
+                usage,
+                exchangeRate.UsdToKrw));
         }
         catch (Exception exception)
         {
@@ -2024,7 +2055,7 @@ public partial class MainWindow : Window
                 requestModel,
                 _conversationHistory.ToList(),
                 _generationCancellation.Token);
-            SaveUsageEstimate(requestModel, usage);
+            await SaveUsageEstimateAsync(requestModel, usage);
 
             var regeneratedModelContent = CreateModelHistoryContent(modelMessage);
             _chatStore.ReplaceLatestExchange(_currentConversationId, userMessage, modelMessage);
@@ -2211,7 +2242,7 @@ public partial class MainWindow : Window
                 requestModel,
                 _conversationHistory.ToList(),
                 _generationCancellation.Token);
-            SaveUsageEstimate(requestModel, usage);
+            await SaveUsageEstimateAsync(requestModel, usage);
 
             var regeneratedModelContent = CreateModelHistoryContent(modelMessage);
             _chatStore.ReplaceLatestModelMessage(_currentConversationId, modelMessage);

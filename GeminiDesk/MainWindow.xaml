@@ -1171,10 +1171,11 @@
                                    FontWeight="Bold"
                                    Foreground="White"
                                    Text="₩0.00" />
-                        <TextBlock Margin="1,7,0,0"
+                        <TextBlock x:Name="UsageExchangeRateText"
+                                   Margin="1,7,0,0"
                                    FontSize="10.5"
                                    Foreground="#CCFFFFFF"
-                                   Text="편의 환산 기준 · $1 = ₩1,400" />
+                                   Text="ECB 환율 확인 중…" />
                     </StackPanel>
                     <Border Grid.Column="1"
                             MinWidth="94"
