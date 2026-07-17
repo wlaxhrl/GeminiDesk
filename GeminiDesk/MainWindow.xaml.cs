@@ -50,10 +50,7 @@ public partial class MainWindow : Window
     private UpdateInfo? _availableUpdate;
     private ChatMessage? _editingUserMessage;
     private string? _currentConversationId;
-    private string _activeApiKeyProvider = ModelProvider.Google;
-    private bool _isApiKeyUiInitialized;
     private string _selectedModelId = DefaultModelId;
-    private bool _isUpdatingRememberApiKey;
     private bool _isUpdatingConversationSelection;
     private bool _isCheckingForUpdates;
     private bool _isDownloadingUpdate;
@@ -252,7 +249,6 @@ public partial class MainWindow : Window
 
     private void SelectModel(AiModelOption model, bool persist, bool showStatus)
     {
-        SwitchApiKeyProvider(model.Provider);
         _selectedModelId = model.Id;
         SelectedModelIcon.Text = model.Icon;
         SelectedModelName.Text = model.ShortName;
@@ -487,135 +483,147 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
+
+        RefreshApiKeySettingsFields();
     }
 
-    private void SwitchApiKeyProvider(string provider)
+    private void ApiKeySettingsButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_isApiKeyUiInitialized)
-        {
-            CaptureActiveApiKey();
-
-            if (RememberApiKeyCheckBox.IsChecked == true)
-            {
-                SaveRememberedApiKey(showConfirmation: false);
-            }
-        }
-
-        _activeApiKeyProvider = provider;
-        var providerName = GetProviderDisplayName(provider);
-        ApiKeyProviderLabel.Text = $"{providerName} API 키";
-        AutomationProperties.SetName(ApiKeyBox, $"{providerName} API 키");
-        ApiKeyBox.Password = _apiKeys.GetValueOrDefault(provider, string.Empty);
-        SetRememberApiKeyChecked(_rememberedApiKeyProviders.Contains(provider));
-        _isApiKeyUiInitialized = true;
+        ShowApiKeySettings();
     }
 
-    private void CaptureActiveApiKey()
+    private void BackToChatButton_Click(object sender, RoutedEventArgs e)
     {
-        var apiKey = NormalizeApiKey(ApiKeyBox.Password);
-        if (string.IsNullOrWhiteSpace(apiKey))
-        {
-            _apiKeys.Remove(_activeApiKeyProvider);
-            return;
-        }
-
-        _apiKeys[_activeApiKeyProvider] = apiKey;
+        ShowChatView();
     }
 
-    private void RememberApiKeyCheckBox_Checked(object sender, RoutedEventArgs e)
+    private void ShowApiKeySettings(string? focusProvider = null, string? notice = null)
     {
-        if (_isUpdatingRememberApiKey)
-        {
-            return;
-        }
+        RefreshApiKeySettingsFields();
+        ChatView.Visibility = Visibility.Collapsed;
+        ApiKeySettingsView.Visibility = Visibility.Visible;
+        ApiKeySettingsNotice.Text = notice ?? "키를 지운 채 저장하면 해당 키도 Windows에서 삭제돼요.";
+        ApiKeySettingsView.ScrollToTop();
 
-        SaveRememberedApiKey(showConfirmation: true);
-    }
-
-    private void RememberApiKeyCheckBox_Unchecked(object sender, RoutedEventArgs e)
-    {
-        if (_isUpdatingRememberApiKey)
+        if (focusProvider is not null)
         {
-            return;
-        }
-
-        try
-        {
-            _apiKeyCredentialStores[_activeApiKeyProvider].Delete();
-            _rememberedApiKeyProviders.Remove(_activeApiKeyProvider);
-            StatusText.Text = $"{GetProviderDisplayName(_activeApiKeyProvider)} API 키 저장을 해제했어요";
-        }
-        catch (Exception exception)
-        {
-            SetRememberApiKeyChecked(true);
-            MessageBox.Show(
-                $"저장된 API 키를 삭제하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
-                "API 키 삭제 오류",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            Dispatcher.BeginInvoke(() => GetApiKeyBox(focusProvider).Focus());
         }
     }
 
-    private void ApiKeyBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    private void ShowChatView()
     {
-        if (RememberApiKeyCheckBox.IsChecked == true)
-        {
-            SaveRememberedApiKey(showConfirmation: false);
-        }
+        ApiKeySettingsView.Visibility = Visibility.Collapsed;
+        ChatView.Visibility = Visibility.Visible;
+        PromptBox.Focus();
     }
 
-    private bool SaveRememberedApiKey(bool showConfirmation)
+    private void RefreshApiKeySettingsFields()
     {
-        if (RememberApiKeyCheckBox.IsChecked != true)
+        GeminiApiKeyBox.Password = _apiKeys.GetValueOrDefault(ModelProvider.Google, string.Empty);
+        OpenAiApiKeyBox.Password = _apiKeys.GetValueOrDefault(ModelProvider.OpenAi, string.Empty);
+        AnthropicApiKeyBox.Password = _apiKeys.GetValueOrDefault(ModelProvider.Anthropic, string.Empty);
+
+        RefreshApiKeyStatus(ModelProvider.Google, GeminiApiKeyStatusText);
+        RefreshApiKeyStatus(ModelProvider.OpenAi, OpenAiApiKeyStatusText);
+        RefreshApiKeyStatus(ModelProvider.Anthropic, AnthropicApiKeyStatusText);
+    }
+
+    private void RefreshApiKeyStatus(string provider, TextBlock statusText)
+    {
+        var isSaved = _rememberedApiKeyProviders.Contains(provider) &&
+                      !string.IsNullOrWhiteSpace(_apiKeys.GetValueOrDefault(provider));
+        statusText.Text = isSaved ? "✓ 저장됨" : "입력 필요";
+        statusText.Foreground = (System.Windows.Media.Brush)FindResource(
+            isSaved ? "PrimaryBrush" : "MutedBrush");
+    }
+
+    private async void SaveAllApiKeysButton_Click(object sender, RoutedEventArgs e)
+    {
+        var entries = new (string Provider, PasswordBox Input)[]
         {
-            return false;
-        }
+            (ModelProvider.Google, GeminiApiKeyBox),
+            (ModelProvider.OpenAi, OpenAiApiKeyBox),
+            (ModelProvider.Anthropic, AnthropicApiKeyBox)
+        };
+        var failures = new List<string>();
 
-        var apiKey = NormalizeApiKey(ApiKeyBox.Password);
-        if (string.IsNullOrWhiteSpace(apiKey))
+        SaveAllApiKeysButton.IsEnabled = false;
+        SaveAllApiKeysButton.Content = "저장하는 중…";
+
+        await Task.Yield();
+
+        foreach (var (provider, input) in entries)
         {
-            if (showConfirmation)
-            {
-                StatusText.Text = "API 키를 입력하면 안전하게 기억해요";
-            }
+            var apiKey = NormalizeApiKey(input.Password);
+            input.Password = apiKey;
 
-            return false;
-        }
-
-        try
-        {
-            ApiKeyBox.Password = apiKey;
-            _apiKeys[_activeApiKeyProvider] = apiKey;
-            _apiKeyCredentialStores[_activeApiKeyProvider].Write(apiKey);
-            _rememberedApiKeyProviders.Add(_activeApiKeyProvider);
-
-            if (showConfirmation)
-            {
-                StatusText.Text = $"{GetProviderDisplayName(_activeApiKeyProvider)} API 키를 Windows에 안전하게 저장했어요";
-            }
-
-            return true;
-        }
-        catch (Exception exception)
-        {
             try
             {
-                _apiKeyCredentialStores[_activeApiKeyProvider].Delete();
+                if (string.IsNullOrWhiteSpace(apiKey))
+                {
+                    _apiKeyCredentialStores[provider].Delete();
+                    _apiKeys.Remove(provider);
+                    _rememberedApiKeyProviders.Remove(provider);
+                }
+                else
+                {
+                    _apiKeyCredentialStores[provider].Write(apiKey);
+                    _apiKeys[provider] = apiKey;
+                    _rememberedApiKeyProviders.Add(provider);
+                }
             }
-            catch
+            catch (Exception exception)
             {
-                // 원래 저장 오류를 사용자에게 보여 줍니다.
+                failures.Add($"{GetProviderDisplayName(provider)}: {exception.Message}");
             }
-
-            SetRememberApiKeyChecked(false);
-            _rememberedApiKeyProviders.Remove(_activeApiKeyProvider);
-            MessageBox.Show(
-                $"API 키를 Windows에 저장하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
-                "API 키 저장 오류",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            return false;
         }
+
+        SaveAllApiKeysButton.IsEnabled = true;
+        SaveAllApiKeysButton.Content = "모두 저장하기";
+        RefreshApiKeySettingsFields();
+
+        if (failures.Count == 0)
+        {
+            var savedCount = _rememberedApiKeyProviders.Count;
+            ApiKeySettingsNotice.Text = savedCount == 0
+                ? "저장된 API 키를 모두 삭제했어요."
+                : $"API 키 {savedCount}개를 Windows에 안전하게 저장했어요 ✓";
+            StatusText.Text = "API 키 설정을 저장했어요";
+            return;
+        }
+
+        ApiKeySettingsNotice.Text = "일부 API 키를 저장하지 못했어요.";
+        MessageBox.Show(
+            $"일부 API 키를 Windows에 저장하지 못했습니다.{System.Environment.NewLine}{string.Join(System.Environment.NewLine, failures)}",
+            "API 키 저장 오류",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+    }
+
+    private bool TryGetApiKeyForProvider(string provider, out string apiKey)
+    {
+        apiKey = NormalizeApiKey(_apiKeys.GetValueOrDefault(provider, string.Empty));
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            _apiKeys[provider] = apiKey;
+            return true;
+        }
+
+        ShowApiKeySettings(
+            provider,
+            $"{GetProviderDisplayName(provider)} API 키가 필요해요. 입력한 뒤 ‘모두 저장하기’를 눌러 주세요.");
+        return false;
+    }
+
+    private PasswordBox GetApiKeyBox(string provider)
+    {
+        return provider switch
+        {
+            ModelProvider.OpenAi => OpenAiApiKeyBox,
+            ModelProvider.Anthropic => AnthropicApiKeyBox,
+            _ => GeminiApiKeyBox
+        };
     }
 
     private static string GetProviderDisplayName(string provider)
@@ -626,20 +634,6 @@ public partial class MainWindow : Window
             ModelProvider.Anthropic => "Anthropic",
             _ => "Gemini"
         };
-    }
-
-    private void SetRememberApiKeyChecked(bool isChecked)
-    {
-        _isUpdatingRememberApiKey = true;
-
-        try
-        {
-            RememberApiKeyCheckBox.IsChecked = isChecked;
-        }
-        finally
-        {
-            _isUpdatingRememberApiKey = false;
-        }
     }
 
     private async void SendButton_Click(object sender, RoutedEventArgs e)
@@ -702,26 +696,12 @@ public partial class MainWindow : Window
         }
 
         var requestModel = GetSelectedModel();
-        SwitchApiKeyProvider(requestModel.Provider);
-        var apiKey = NormalizeApiKey(ApiKeyBox.Password);
         var prompt = PromptBox.Text.Trim();
 
-        if (string.IsNullOrWhiteSpace(apiKey))
+        if (!TryGetApiKeyForProvider(requestModel.Provider, out var apiKey))
         {
-            MessageBox.Show(
-                $"{GetProviderDisplayName(requestModel.Provider)} API 키를 입력해 주세요.",
-                "API 키 필요",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            ApiKeyBox.Focus();
             return;
         }
-
-        if (apiKey != ApiKeyBox.Password)
-        {
-            ApiKeyBox.Password = apiKey;
-        }
-        _apiKeys[requestModel.Provider] = apiKey;
 
         if (string.IsNullOrWhiteSpace(prompt) && _attachments.Count == 0)
         {
@@ -810,7 +790,6 @@ public partial class MainWindow : Window
                 requestContents,
                 _generationCancellation.Token);
 
-            SaveRememberedApiKey(showConfirmation: false);
             CompleteExchange(userContent, userMessage, modelMessage, prompt, attachments, "응답 완료 · 저장됨");
         }
         catch (OperationCanceledException) when (_generationCancellation.IsCancellationRequested)
@@ -1089,6 +1068,7 @@ public partial class MainWindow : Window
 
     private void NewChatButton_Click(object sender, RoutedEventArgs e)
     {
+        ShowChatView();
         StartNewChat();
         StatusText.Text = "새 대화 준비됨";
     }
@@ -1100,6 +1080,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        ShowChatView();
         LoadConversation(conversation.Id);
     }
 
@@ -1742,24 +1723,10 @@ public partial class MainWindow : Window
         }
 
         var requestModel = GetSelectedModel();
-        SwitchApiKeyProvider(requestModel.Provider);
-        var apiKey = NormalizeApiKey(ApiKeyBox.Password);
-        if (string.IsNullOrWhiteSpace(apiKey))
+        if (!TryGetApiKeyForProvider(requestModel.Provider, out var apiKey))
         {
-            MessageBox.Show(
-                $"{GetProviderDisplayName(requestModel.Provider)} API 키를 입력해 주세요.",
-                "API 키 필요",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            ApiKeyBox.Focus();
             return;
         }
-
-        if (apiKey != ApiKeyBox.Password)
-        {
-            ApiKeyBox.Password = apiKey;
-        }
-        _apiKeys[requestModel.Provider] = apiKey;
 
         var originalUserText = userMessage.Text;
         var originalModelText = modelMessage.Text;
@@ -1815,7 +1782,6 @@ public partial class MainWindow : Window
             _chatStore.ReplaceLatestExchange(_currentConversationId, userMessage, modelMessage);
             _conversationHistory.Add(regeneratedModelContent);
             userMessage.EditText = editedPrompt;
-            SaveRememberedApiKey(showConfirmation: false);
             UpdateMessageActionAvailability();
 
             try
@@ -1965,24 +1931,10 @@ public partial class MainWindow : Window
         }
 
         var requestModel = GetSelectedModel();
-        SwitchApiKeyProvider(requestModel.Provider);
-        var apiKey = NormalizeApiKey(ApiKeyBox.Password);
-        if (string.IsNullOrWhiteSpace(apiKey))
+        if (!TryGetApiKeyForProvider(requestModel.Provider, out var apiKey))
         {
-            MessageBox.Show(
-                $"{GetProviderDisplayName(requestModel.Provider)} API 키를 입력해 주세요.",
-                "API 키 필요",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            ApiKeyBox.Focus();
             return;
         }
-
-        if (apiKey != ApiKeyBox.Password)
-        {
-            ApiKeyBox.Password = apiKey;
-        }
-        _apiKeys[requestModel.Provider] = apiKey;
 
         var originalText = modelMessage.Text;
         var originalModelId = modelMessage.ModelId;
@@ -2015,7 +1967,6 @@ public partial class MainWindow : Window
             var regeneratedModelContent = CreateModelHistoryContent(modelMessage);
             _chatStore.ReplaceLatestModelMessage(_currentConversationId, modelMessage);
             _conversationHistory.Add(regeneratedModelContent);
-            SaveRememberedApiKey(showConfirmation: false);
             UpdateMessageActionAvailability();
 
             try
@@ -2134,8 +2085,11 @@ public partial class MainWindow : Window
         WebSearchCheckBox.IsEnabled = !isBusy && SupportsWebSearch(selectedModel);
         ModelSelector.IsEnabled = !isBusy;
         UpdateButton.IsEnabled = !isBusy && !isEditing && !_isCheckingForUpdates && !_isDownloadingUpdate;
-        ApiKeyBox.IsEnabled = !isBusy;
-        RememberApiKeyCheckBox.IsEnabled = !isBusy;
+        ApiKeySettingsButton.IsEnabled = !isBusy && !isEditing;
+        GeminiApiKeyBox.IsEnabled = !isBusy;
+        OpenAiApiKeyBox.IsEnabled = !isBusy;
+        AnthropicApiKeyBox.IsEnabled = !isBusy;
+        SaveAllApiKeysButton.IsEnabled = !isBusy;
         PromptBox.IsEnabled = !isBusy && !isEditing;
 
         if (isBusy)

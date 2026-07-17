@@ -202,6 +202,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -234,7 +235,15 @@
                         Click="NewChatButton_Click"
                         Content="＋  새 대화" />
 
-                <DockPanel Grid.Row="2" Margin="4,22,4,8">
+                <Button x:Name="ApiKeySettingsButton"
+                        Grid.Row="2"
+                        Height="40"
+                        Margin="0,8,0,0"
+                        Style="{StaticResource SoftButton}"
+                        Click="ApiKeySettingsButton_Click"
+                        Content="🔑  API 키 설정" />
+
+                <DockPanel Grid.Row="3" Margin="4,22,4,8">
                     <TextBlock FontSize="12"
                                FontWeight="SemiBold"
                                Foreground="{StaticResource MutedBrush}"
@@ -250,7 +259,7 @@
                 </DockPanel>
 
                 <ListBox x:Name="ConversationList"
-                         Grid.Row="3"
+                         Grid.Row="4"
                          ItemsSource="{Binding Conversations}"
                          Background="Transparent"
                          BorderThickness="0"
@@ -302,14 +311,14 @@
                 </ListBox>
 
                 <Button x:Name="DeleteChatButton"
-                        Grid.Row="4"
+                        Grid.Row="5"
                         Height="36"
                         Margin="0,12,0,0"
                         Style="{StaticResource DangerButton}"
                         Click="DeleteChatButton_Click"
                         Content="선택한 대화 삭제" />
 
-                <StackPanel Grid.Row="5" Margin="2,10,2,0">
+                <StackPanel Grid.Row="6" Margin="2,10,2,0">
                     <DockPanel LastChildFill="False">
                         <TextBlock x:Name="VersionText"
                                    VerticalAlignment="Center"
@@ -336,9 +345,8 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Column="1" Margin="28,22,28,18">
+        <Grid x:Name="ChatView" Grid.Column="1" Margin="28,22,28,18">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
@@ -402,74 +410,6 @@
             </DockPanel>
 
             <Border Grid.Row="1"
-                    Margin="0,0,0,14"
-                    Padding="15"
-                    Background="{StaticResource CardBrush}"
-                    BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="17">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0"
-                            Width="34"
-                            Height="34"
-                            Margin="0,0,11,0"
-                            Background="{StaticResource PinkSoftBrush}"
-                            CornerRadius="11">
-                        <TextBlock HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   FontSize="15"
-                                   Text="🔑" />
-                    </Border>
-                    <Border Grid.Column="1"
-                            Height="38"
-                            Background="#FFFCFBFE"
-                            BorderBrush="{StaticResource BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="13">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Border Margin="7,6,4,6"
-                                    Padding="8,0"
-                                    VerticalAlignment="Stretch"
-                                    Background="{StaticResource PinkSoftBrush}"
-                                    CornerRadius="7">
-                                <TextBlock x:Name="ApiKeyProviderLabel"
-                                           VerticalAlignment="Center"
-                                           FontSize="10"
-                                           FontWeight="SemiBold"
-                                           Foreground="#FF9D5E7A"
-                                           Text="Gemini API 키" />
-                            </Border>
-                            <PasswordBox x:Name="ApiKeyBox"
-                                         Grid.Column="1"
-                                         AutomationProperties.Name="Gemini API 키"
-                                         Style="{StaticResource RoundedPasswordBox}"
-                                         VerticalContentAlignment="Center"
-                                         LostKeyboardFocus="ApiKeyBox_LostKeyboardFocus" />
-                        </Grid>
-                    </Border>
-                    <CheckBox x:Name="RememberApiKeyCheckBox"
-                              Grid.Column="2"
-                              Margin="13,0,2,0"
-                              VerticalAlignment="Center"
-                              Checked="RememberApiKeyCheckBox_Checked"
-                              Content="API 키 기억하기"
-                              Cursor="Hand"
-                              FontSize="12"
-                              Foreground="{StaticResource MutedBrush}"
-                              Unchecked="RememberApiKeyCheckBox_Unchecked" />
-                </Grid>
-            </Border>
-
-            <Border Grid.Row="2"
                     Padding="18"
                     Background="{StaticResource CardBrush}"
                     BorderBrush="{StaticResource BorderBrush}"
@@ -911,12 +851,205 @@
                 </Grid>
             </Border>
 
-            <TextBlock Grid.Row="3"
+            <TextBlock Grid.Row="2"
                        Margin="0,10,2,0"
                        HorizontalAlignment="Right"
                        FontSize="10"
                        Foreground="#FFA39EAD"
                        Text="대화는 이 PC에만 조용히 저장돼요" />
         </Grid>
+
+        <ScrollViewer x:Name="ApiKeySettingsView"
+                      Grid.Column="1"
+                      Margin="28,22,28,18"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      Visibility="Collapsed">
+            <Grid MaxWidth="820" HorizontalAlignment="Center">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="2,0,2,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock FontSize="27"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource InkBrush}"
+                                   Text="API 키 설정" />
+                        <TextBlock Margin="1,6,0,0"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Text="사용할 AI의 키를 한곳에서 편하게 관리해요 🔐" />
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            Height="38"
+                            Padding="14,6"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource PillButton}"
+                            Click="BackToChatButton_Click"
+                            Content="←  채팅으로 돌아가기" />
+                </Grid>
+
+                <Border Grid.Row="1"
+                        Margin="0,0,0,14"
+                        Padding="16,13"
+                        Background="{StaticResource PrimarySoftBrush}"
+                        CornerRadius="15">
+                    <DockPanel>
+                        <TextBlock Margin="0,0,10,0"
+                                   VerticalAlignment="Center"
+                                   FontSize="17"
+                                   Text="🛡️" />
+                        <TextBlock VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="#FF5D51C6"
+                                   Text="저장한 키는 이 PC의 Windows 자격 증명 관리자에 보관돼요. 대화 기록에는 들어가지 않아요."
+                                   TextWrapping="Wrap" />
+                    </DockPanel>
+                </Border>
+
+                <StackPanel Grid.Row="2">
+                    <Border Margin="0,0,0,12"
+                            Padding="18"
+                            Background="{StaticResource CardBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="19">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="44" Height="44" Margin="0,0,15,0"
+                                    VerticalAlignment="Top" Background="#FFEAF2FF" CornerRadius="14">
+                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           FontSize="19" Text="✦" />
+                            </Border>
+                            <StackPanel Grid.Column="1">
+                                <DockPanel Margin="1,0,1,9" LastChildFill="False">
+                                    <TextBlock FontSize="16" FontWeight="Bold"
+                                               Foreground="{StaticResource InkBrush}" Text="Google Gemini" />
+                                    <TextBlock x:Name="GeminiApiKeyStatusText" DockPanel.Dock="Right"
+                                               VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{StaticResource MutedBrush}" Text="입력 필요" />
+                                </DockPanel>
+                                <Border Height="44" Background="#FFFCFBFE" BorderBrush="{StaticResource BorderBrush}"
+                                        BorderThickness="1" CornerRadius="13">
+                                    <PasswordBox x:Name="GeminiApiKeyBox"
+                                                 AutomationProperties.Name="Google Gemini API 키"
+                                                 Style="{StaticResource RoundedPasswordBox}"
+                                                 VerticalContentAlignment="Center" />
+                                </Border>
+                                <TextBlock Margin="2,7,0,0" FontSize="10.5"
+                                           Foreground="{StaticResource MutedBrush}"
+                                           Text="Google AI Studio에서 발급한 키" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Margin="0,0,0,12"
+                            Padding="18"
+                            Background="{StaticResource CardBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="19">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="44" Height="44" Margin="0,0,15,0"
+                                    VerticalAlignment="Top" Background="#FFEBF7F0" CornerRadius="14">
+                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           FontSize="18" Text="◎" />
+                            </Border>
+                            <StackPanel Grid.Column="1">
+                                <DockPanel Margin="1,0,1,9" LastChildFill="False">
+                                    <TextBlock FontSize="16" FontWeight="Bold"
+                                               Foreground="{StaticResource InkBrush}" Text="OpenAI GPT" />
+                                    <TextBlock x:Name="OpenAiApiKeyStatusText" DockPanel.Dock="Right"
+                                               VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{StaticResource MutedBrush}" Text="입력 필요" />
+                                </DockPanel>
+                                <Border Height="44" Background="#FFFCFBFE" BorderBrush="{StaticResource BorderBrush}"
+                                        BorderThickness="1" CornerRadius="13">
+                                    <PasswordBox x:Name="OpenAiApiKeyBox"
+                                                 AutomationProperties.Name="OpenAI API 키"
+                                                 Style="{StaticResource RoundedPasswordBox}"
+                                                 VerticalContentAlignment="Center" />
+                                </Border>
+                                <TextBlock Margin="2,7,0,0" FontSize="10.5"
+                                           Foreground="{StaticResource MutedBrush}"
+                                           Text="OpenAI Platform에서 발급한 키" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Padding="18"
+                            Background="{StaticResource CardBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="19">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="44" Height="44" Margin="0,0,15,0"
+                                    VerticalAlignment="Top" Background="#FFFFF0E8" CornerRadius="14">
+                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           FontSize="18" Text="✺" />
+                            </Border>
+                            <StackPanel Grid.Column="1">
+                                <DockPanel Margin="1,0,1,9" LastChildFill="False">
+                                    <TextBlock FontSize="16" FontWeight="Bold"
+                                               Foreground="{StaticResource InkBrush}" Text="Anthropic Claude" />
+                                    <TextBlock x:Name="AnthropicApiKeyStatusText" DockPanel.Dock="Right"
+                                               VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{StaticResource MutedBrush}" Text="입력 필요" />
+                                </DockPanel>
+                                <Border Height="44" Background="#FFFCFBFE" BorderBrush="{StaticResource BorderBrush}"
+                                        BorderThickness="1" CornerRadius="13">
+                                    <PasswordBox x:Name="AnthropicApiKeyBox"
+                                                 AutomationProperties.Name="Anthropic API 키"
+                                                 Style="{StaticResource RoundedPasswordBox}"
+                                                 VerticalContentAlignment="Center" />
+                                </Border>
+                                <TextBlock Margin="2,7,0,0" FontSize="10.5"
+                                           Foreground="{StaticResource MutedBrush}"
+                                           Text="Anthropic Console에서 발급한 키" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <Grid Grid.Row="3" Margin="2,16,2,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="ApiKeySettingsNotice"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               Foreground="{StaticResource MutedBrush}"
+                               Text="키를 지운 채 저장하면 해당 키도 Windows에서 삭제돼요."
+                               TextWrapping="Wrap" />
+                    <Button x:Name="SaveAllApiKeysButton"
+                            Grid.Column="1"
+                            Width="150"
+                            Height="43"
+                            Margin="18,0,0,0"
+                            Style="{StaticResource PrimaryButton}"
+                            Click="SaveAllApiKeysButton_Click"
+                            Content="모두 저장하기" />
+                </Grid>
+            </Grid>
+        </ScrollViewer>
     </Grid>
 </Window>
