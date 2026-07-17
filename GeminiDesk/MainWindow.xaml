@@ -289,13 +289,13 @@
                         Click="NewChatButton_Click"
                         Content="＋  새 대화" />
 
-                <Button x:Name="ApiKeySettingsButton"
+                <Button x:Name="SettingsButton"
                         Grid.Row="2"
                         Height="40"
                         Margin="0,8,0,0"
                         Style="{StaticResource SoftButton}"
-                        Click="ApiKeySettingsButton_Click"
-                        Content="🔑  API 키 설정" />
+                        Click="SettingsButton_Click"
+                        Content="⚙  설정" />
 
                 <Button x:Name="UsageButton"
                         Grid.Row="3"
@@ -944,6 +944,188 @@
                        Text="대화는 이 PC에만 조용히 저장돼요" />
         </Grid>
 
+        <ScrollViewer x:Name="SettingsView"
+                      Grid.Column="1"
+                      Margin="28,22,28,18"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      Visibility="Collapsed">
+            <ScrollViewer.Resources>
+                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimScrollBar}" />
+            </ScrollViewer.Resources>
+            <Grid MaxWidth="820" HorizontalAlignment="Center">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="2,0,2,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock FontSize="27"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource InkBrush}"
+                                   Text="설정" />
+                        <TextBlock Margin="1,6,0,0"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Text="Bunny Desk를 내 취향에 맞게 가볍게 정리해요 ⚙" />
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            Height="38"
+                            Padding="14,6"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource PillButton}"
+                            Click="BackToChatButton_Click"
+                            Content="←  채팅으로 돌아가기" />
+                </Grid>
+
+                <StackPanel Grid.Row="1">
+                    <Border Margin="0,0,0,12"
+                            Padding="18"
+                            Background="{StaticResource CardBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="19">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="46" Height="46" Margin="0,0,15,0"
+                                    VerticalAlignment="Center"
+                                    Background="{StaticResource PrimarySoftBrush}"
+                                    CornerRadius="15">
+                                <TextBlock HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="20"
+                                           Text="🔑" />
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock FontSize="16"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource InkBrush}"
+                                           Text="API 키 설정" />
+                                <TextBlock Margin="0,4,12,0"
+                                           FontSize="11"
+                                           Foreground="{StaticResource MutedBrush}"
+                                           Text="Gemini, GPT, Claude 키와 KEY PRESET을 관리해요."
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button x:Name="OpenApiKeySettingsButton"
+                                    Grid.Column="2"
+                                    Height="38"
+                                    Padding="16,6"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource SoftButton}"
+                                    Click="OpenApiKeySettingsButton_Click"
+                                    Content="열기  →" />
+                        </Grid>
+                    </Border>
+
+                    <Border Margin="0,0,0,12"
+                            Padding="18"
+                            Background="{StaticResource CardBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="19">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="46" Height="46" Margin="0,0,15,0"
+                                    VerticalAlignment="Top"
+                                    Background="{StaticResource PinkSoftBrush}"
+                                    CornerRadius="15">
+                                <TextBlock HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="20"
+                                           Text="🔔" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="0,1,18,0">
+                                <TextBlock FontSize="16"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource InkBrush}"
+                                           Text="답변 완료 알림" />
+                                <TextBlock x:Name="NotificationSupportText"
+                                           Margin="0,4,0,0"
+                                           FontSize="11"
+                                           Foreground="{StaticResource MutedBrush}"
+                                           Text="다른 일을 하는 동안 답변이 끝나면 Windows가 알려줘요."
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <CheckBox x:Name="NotificationEnabledCheckBox"
+                                      Grid.Column="2"
+                                      Margin="8,4,2,0"
+                                      VerticalAlignment="Top"
+                                      IsChecked="True"
+                                      FontWeight="SemiBold"
+                                      Foreground="{StaticResource InkBrush}"
+                                      Click="NotificationEnabledCheckBox_Click"
+                                      Content="알림 ON" />
+                        </Grid>
+                    </Border>
+
+                    <Border Padding="18"
+                            Background="{StaticResource CardBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="19">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="46" Height="46" Margin="0,0,15,0"
+                                    VerticalAlignment="Center"
+                                    Background="#FFEAF2FF"
+                                    CornerRadius="15">
+                                <TextBlock HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="20"
+                                           Text="🗂" />
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock FontSize="16"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource InkBrush}"
+                                           Text="채팅 히스토리" />
+                                <TextBlock x:Name="ChatStorageUsageText"
+                                           Margin="0,4,12,0"
+                                           FontSize="11"
+                                           Foreground="{StaticResource MutedBrush}"
+                                           Text="저장공간을 계산하고 있어요…"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button x:Name="DeleteAllChatHistoryButton"
+                                    Grid.Column="2"
+                                    Height="38"
+                                    Padding="15,6"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource DangerButton}"
+                                    Click="DeleteAllChatHistoryButton_Click"
+                                    Content="전체 삭제" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <TextBlock Grid.Row="2"
+                           Margin="4,16,4,4"
+                           HorizontalAlignment="Center"
+                           FontSize="10.5"
+                           Foreground="#FFA39EAD"
+                           Text="전체 삭제는 대화와 첨부파일만 지워요. API 키·설정·사용료 기록은 그대로 남아요."
+                           TextWrapping="Wrap" />
+            </Grid>
+        </ScrollViewer>
+
         <ScrollViewer x:Name="ApiKeySettingsView"
                       Grid.Column="1"
                       Margin="28,22,28,18"
@@ -977,8 +1159,8 @@
                             Padding="14,6"
                             VerticalAlignment="Center"
                             Style="{StaticResource PillButton}"
-                            Click="BackToChatButton_Click"
-                            Content="←  채팅으로 돌아가기" />
+                            Click="BackToSettingsButton_Click"
+                            Content="←  설정으로 돌아가기" />
                 </Grid>
 
                 <Border Grid.Row="1"

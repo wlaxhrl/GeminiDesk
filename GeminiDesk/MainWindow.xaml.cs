@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     private const string LegacySolModelId = "gpt-5.6-sol";
     private const string StandardSolModelId = "gpt-5.6-sol-standard";
     private const string SelectedModelSettingKey = "selected-model";
+    private const string NotificationsEnabledSettingKey = "notifications-enabled";
     private const int ConversationPageSize = 10;
     private const long MaxFileSize = 10 * 1024 * 1024;
     private const long MaxTotalAttachmentSize = 20 * 1024 * 1024;
@@ -48,6 +49,7 @@ public partial class MainWindow : Window
     private readonly AppUpdateService _appUpdateService = new();
     private readonly ChatStore _chatStore;
     private readonly ExchangeRateService _exchangeRateService;
+    private readonly WindowsNotificationService _notificationService;
     private CancellationTokenSource? _generationCancellation;
     private UpdateInfo? _availableUpdate;
     private ChatMessage? _editingUserMessage;
@@ -59,6 +61,7 @@ public partial class MainWindow : Window
     private bool _isUpdatingConversationSelection;
     private bool _isCheckingForUpdates;
     private bool _isDownloadingUpdate;
+    private bool _notificationsEnabled = true;
 
     public ObservableCollection<ChatMessage> Messages { get; } = [];
     public ObservableCollection<ConversationSummary> Conversations { get; } = [];
@@ -78,13 +81,33 @@ public partial class MainWindow : Window
 
         LoadRememberedApiKeys();
         _chatStore = new ChatStore();
+        LoadNotificationPreference();
+        _notificationService = new WindowsNotificationService(
+            _appUpdateService.IsSetupInstalled,
+            ActivateFromNotification);
+        _notificationService.SetEnabled(_notificationsEnabled);
         _exchangeRateService = new ExchangeRateService(_chatStore);
         _modelOptions.AddRange(ModelCatalogService.LoadInitialCatalog());
         LoadSelectedModel();
         _chatStore.CleanupOrphanedAttachments(TimeSpan.FromDays(7));
         RefreshConversations();
+        RefreshSettingsView();
         ContentRendered += MainWindow_ContentRendered;
         PromptBox.Focus();
+    }
+
+    private void LoadNotificationPreference()
+    {
+        try
+        {
+            var storedValue = _chatStore.GetSetting(NotificationsEnabledSettingKey);
+            _notificationsEnabled = !string.Equals(storedValue, "false", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            _notificationsEnabled = true;
+            StatusText.Text = "알림 설정을 불러오지 못해 기본값 ON을 사용해요";
+        }
     }
 
     private void LoadSelectedModel()
@@ -495,7 +518,12 @@ public partial class MainWindow : Window
         RefreshApiKeySettingsFields();
     }
 
-    private void ApiKeySettingsButton_Click(object sender, RoutedEventArgs e)
+    private void SettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        ShowSettingsView();
+    }
+
+    private void OpenApiKeySettingsButton_Click(object sender, RoutedEventArgs e)
     {
         ShowApiKeySettings();
     }
@@ -562,10 +590,29 @@ public partial class MainWindow : Window
         ShowChatView();
     }
 
+    private void BackToSettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        ShowSettingsView();
+    }
+
+    private void ShowSettingsView()
+    {
+        ChatView.Visibility = Visibility.Collapsed;
+        ApiKeySettingsView.Visibility = Visibility.Collapsed;
+        UsageView.Visibility = Visibility.Collapsed;
+        ManualView.Visibility = Visibility.Collapsed;
+        ModelGuideView.Visibility = Visibility.Collapsed;
+        SettingsView.Visibility = Visibility.Visible;
+        RefreshSettingsView();
+        SettingsView.ScrollToTop();
+        SettingsView.Focus();
+    }
+
     private void ShowApiKeySettings(string? focusProvider = null, string? notice = null)
     {
         RefreshApiKeySettingsFields();
         ChatView.Visibility = Visibility.Collapsed;
+        SettingsView.Visibility = Visibility.Collapsed;
         UsageView.Visibility = Visibility.Collapsed;
         ManualView.Visibility = Visibility.Collapsed;
         ModelGuideView.Visibility = Visibility.Collapsed;
@@ -581,6 +628,7 @@ public partial class MainWindow : Window
 
     private void ShowChatView()
     {
+        SettingsView.Visibility = Visibility.Collapsed;
         ApiKeySettingsView.Visibility = Visibility.Collapsed;
         UsageView.Visibility = Visibility.Collapsed;
         ManualView.Visibility = Visibility.Collapsed;
@@ -592,6 +640,7 @@ public partial class MainWindow : Window
     private void ShowUsageView()
     {
         ChatView.Visibility = Visibility.Collapsed;
+        SettingsView.Visibility = Visibility.Collapsed;
         ApiKeySettingsView.Visibility = Visibility.Collapsed;
         ManualView.Visibility = Visibility.Collapsed;
         ModelGuideView.Visibility = Visibility.Collapsed;
@@ -602,6 +651,7 @@ public partial class MainWindow : Window
     private void ShowManualView()
     {
         ChatView.Visibility = Visibility.Collapsed;
+        SettingsView.Visibility = Visibility.Collapsed;
         ApiKeySettingsView.Visibility = Visibility.Collapsed;
         UsageView.Visibility = Visibility.Collapsed;
         ModelGuideView.Visibility = Visibility.Collapsed;
@@ -613,6 +663,7 @@ public partial class MainWindow : Window
     private void ShowDetailedModelGuideView()
     {
         ChatView.Visibility = Visibility.Collapsed;
+        SettingsView.Visibility = Visibility.Collapsed;
         ApiKeySettingsView.Visibility = Visibility.Collapsed;
         UsageView.Visibility = Visibility.Collapsed;
         ManualView.Visibility = Visibility.Collapsed;
@@ -1104,6 +1155,7 @@ public partial class MainWindow : Window
             await SaveUsageEstimateAsync(requestModel, usage);
 
             CompleteExchange(userContent, userMessage, modelMessage, prompt, attachments, "응답 완료 · 저장됨");
+            NotifyReplyCompletedIfNeeded();
         }
         catch (OperationCanceledException) when (_generationCancellation.IsCancellationRequested)
         {
@@ -1561,6 +1613,117 @@ public partial class MainWindow : Window
 
         RefreshConversations();
         StatusText.Text = "대화와 첨부 파일을 삭제했습니다";
+    }
+
+    private void NotificationEnabledCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        var enabled = NotificationEnabledCheckBox.IsChecked == true;
+
+        try
+        {
+            _chatStore.SetSetting(
+                NotificationsEnabledSettingKey,
+                enabled ? "true" : "false");
+            _notificationsEnabled = enabled;
+            _notificationService.SetEnabled(enabled);
+            RefreshSettingsView();
+            StatusText.Text = enabled ? "답변 완료 알림을 켰어요" : "답변 완료 알림을 껐어요";
+        }
+        catch (Exception exception)
+        {
+            NotificationEnabledCheckBox.IsChecked = _notificationsEnabled;
+            MessageBox.Show(
+                $"알림 설정을 저장하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                "설정 저장 오류",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void DeleteAllChatHistoryButton_Click(object sender, RoutedEventArgs e)
+    {
+        var result = MessageBox.Show(
+            "모든 대화와 첨부 파일을 삭제할까요?\n\n" +
+            "API 키·설정·사용료 기록은 그대로 남지만, 삭제한 대화는 복구할 수 없어요.",
+            "채팅 히스토리 전체 삭제",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            _chatStore.DeleteAllConversations();
+            StartNewChat();
+            Conversations.Clear();
+            RefreshConversations();
+            RefreshSettingsView();
+            StatusText.Text = "채팅 히스토리를 모두 삭제했습니다";
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                $"채팅 히스토리를 모두 삭제하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                "전체 삭제 오류",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void RefreshSettingsView()
+    {
+        NotificationEnabledCheckBox.IsChecked = _notificationsEnabled;
+        NotificationEnabledCheckBox.IsEnabled = _notificationService.IsSupported &&
+                                                _generationCancellation is null;
+
+        NotificationSupportText.Text = _notificationService.IsSupported
+            ? _notificationsEnabled
+                ? "앱이 뒤에 있거나 최소화됐을 때 Windows 배너와 소리로 알려줘요."
+                : "현재 알림이 꺼져 있어요. 필요할 때 다시 켤 수 있어요."
+            : _appUpdateService.IsPortable
+                ? "포터블판에서는 지원하지 않아요. 설치판에서 사용할 수 있어요."
+                : _appUpdateService.IsSetupInstalled
+                    ? "이 PC에서 Windows 알림을 시작하지 못했어요."
+                    : "개발 실행에서는 지원하지 않아요. 설치판에서 사용할 수 있어요.";
+
+        try
+        {
+            var bytes = _chatStore.GetChatHistoryStorageBytes();
+            ChatStorageUsageText.Text = $"대화 내용과 첨부파일이 약 {FormatStorageSize(bytes)} 사용 중이에요.";
+        }
+        catch
+        {
+            ChatStorageUsageText.Text = "현재 사용 중인 저장공간을 계산하지 못했어요.";
+        }
+    }
+
+    private static string FormatStorageSize(long bytes)
+    {
+        if (bytes <= 0)
+        {
+            return "0 B";
+        }
+
+        if (bytes < 1024)
+        {
+            return $"{bytes:N0} B";
+        }
+
+        if (bytes < 1024 * 1024)
+        {
+            return $"{bytes / 1024d:N1} KB";
+        }
+
+        if (bytes < 1024L * 1024 * 1024)
+        {
+            return $"{bytes / (1024d * 1024):N1} MB";
+        }
+
+        return $"{bytes / (1024d * 1024 * 1024):N2} GB";
     }
 
     private void StartNewChat()
@@ -2229,6 +2392,8 @@ public partial class MainWindow : Window
             {
                 StatusText.Text = "편집한 대화는 저장됨 · 대화 목록 새로고침 실패";
             }
+
+            NotifyReplyCompletedIfNeeded();
         }
         catch (OperationCanceledException) when (_generationCancellation.IsCancellationRequested)
         {
@@ -2415,6 +2580,8 @@ public partial class MainWindow : Window
             {
                 StatusText.Text = "다시 만든 답변은 저장됨 · 대화 목록 새로고침 실패";
             }
+
+            NotifyReplyCompletedIfNeeded();
         }
         catch (OperationCanceledException) when (_generationCancellation.IsCancellationRequested)
         {
@@ -2524,9 +2691,12 @@ public partial class MainWindow : Window
         UpdateButton.IsEnabled = !isBusy && !isEditing && !_isCheckingForUpdates && !_isDownloadingUpdate;
         ManualButton.IsEnabled = !isBusy && !isEditing;
         DetailedModelGuideButton.IsEnabled = !isBusy && !isEditing;
-        ApiKeySettingsButton.IsEnabled = !isBusy && !isEditing;
+        SettingsButton.IsEnabled = !isBusy && !isEditing;
         UsageButton.IsEnabled = !isBusy && !isEditing;
         CompareSubscriptionsButton.IsEnabled = !isBusy && !isEditing;
+        OpenApiKeySettingsButton.IsEnabled = !isBusy;
+        NotificationEnabledCheckBox.IsEnabled = !isBusy && _notificationService.IsSupported;
+        DeleteAllChatHistoryButton.IsEnabled = !isBusy;
         GeminiApiKeyBox.IsEnabled = !isBusy;
         OpenAiApiKeyBox.IsEnabled = !isBusy;
         AnthropicApiKeyBox.IsEnabled = !isBusy;
@@ -2546,10 +2716,40 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(() => ChatScrollViewer.ScrollToEnd());
     }
 
+    private void NotifyReplyCompletedIfNeeded()
+    {
+        if (!_notificationsEnabled ||
+            !_notificationService.IsSupported ||
+            (IsActive && WindowState != WindowState.Minimized))
+        {
+            return;
+        }
+
+        _notificationService.ShowReplyCompleted();
+    }
+
+    private void ActivateFromNotification()
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (WindowState == WindowState.Minimized)
+            {
+                WindowState = WindowState.Normal;
+            }
+
+            Show();
+            Activate();
+            Topmost = true;
+            Topmost = false;
+            Focus();
+        });
+    }
+
     protected override void OnClosed(EventArgs e)
     {
         _generationCancellation?.Cancel();
         _generationCancellation?.Dispose();
+        _notificationService.Dispose();
         base.OnClosed(e);
     }
 }

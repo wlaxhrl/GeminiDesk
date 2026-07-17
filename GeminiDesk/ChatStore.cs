@@ -52,6 +52,22 @@ public sealed class ChatStore
         command.ExecuteNonQuery();
     }
 
+    public long GetChatHistoryStorageBytes()
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                (SELECT COALESCE(SUM(LENGTH(CAST(Title AS BLOB))), 0) FROM Conversations) +
+                (SELECT COALESCE(SUM(LENGTH(CAST(Text AS BLOB))), 0) FROM Messages) +
+                (SELECT COALESCE(SUM(Size), 0) FROM Attachments) +
+                (SELECT COALESCE(SUM(
+                    LENGTH(CAST(Title AS BLOB)) + LENGTH(CAST(Uri AS BLOB))), 0)
+                 FROM Sources);
+            """;
+        return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+    }
+
     internal void SaveUsage(UsageRecord record)
     {
         using var connection = OpenConnection();
@@ -510,6 +526,46 @@ public sealed class ChatStore
             catch (UnauthorizedAccessException)
             {
                 // 사용 중이거나 권한이 변경된 파일은 다음 정리 때 다시 시도합니다.
+            }
+        }
+    }
+
+    public void DeleteAllConversations()
+    {
+        using (var connection = OpenConnection())
+        {
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "DELETE FROM Conversations;";
+                command.ExecuteNonQuery();
+            }
+
+            using var vacuumCommand = connection.CreateCommand();
+            vacuumCommand.CommandText = "VACUUM;";
+            vacuumCommand.ExecuteNonQuery();
+        }
+
+        if (!Directory.Exists(_attachmentFolder))
+        {
+            return;
+        }
+
+        foreach (var path in Directory.EnumerateFiles(
+                     _attachmentFolder,
+                     "*",
+                     SearchOption.AllDirectories))
+        {
+            try
+            {
+                File.Delete(path);
+            }
+            catch (IOException)
+            {
+                // 잠긴 파일은 다음 고아 파일 정리 때 다시 시도합니다.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // 권한이 변경된 파일은 다음 고아 파일 정리 때 다시 시도합니다.
             }
         }
     }

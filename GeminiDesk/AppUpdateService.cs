@@ -12,6 +12,10 @@ public sealed class AppUpdateService
 
     public bool IsInstalled => _manager.IsInstalled;
 
+    public bool IsPortable => _manager.IsPortable;
+
+    public bool IsSetupInstalled => IsInstalled && !IsPortable;
+
     public string CurrentVersion
     {
         get
