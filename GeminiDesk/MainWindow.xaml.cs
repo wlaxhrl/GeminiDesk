@@ -306,11 +306,15 @@ public partial class MainWindow : Window
     private void UpdateWebSearchAvailability(AiModelOption model)
     {
         var supportsWebSearch = SupportsWebSearch(model);
+        var isAnthropic = model.Provider == ModelProvider.Anthropic;
+
+        WebSearchCheckBox.Visibility = isAnthropic ? Visibility.Collapsed : Visibility.Visible;
+        WebSearchUnavailableText.Visibility = isAnthropic ? Visibility.Visible : Visibility.Collapsed;
         WebSearchCheckBox.IsEnabled = _generationCancellation is null && supportsWebSearch;
         WebSearchCheckBox.ToolTip = supportsWebSearch
             ? null
-            : model.Provider == ModelProvider.Anthropic
-                ? "Claude에서는 아직 검색을 함께 사용할 수 없어요"
+            : isAnthropic
+                ? null
                 : "GPT Image 2에서는 검색을 함께 사용할 수 없어요";
     }
 
