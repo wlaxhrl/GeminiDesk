@@ -23,6 +23,7 @@ public partial class MainWindow : Window
 {
     private const string GoogleApiKeyCredentialTarget = "GeminiDesk:GoogleGeminiApiKey";
     private const string OpenAiApiKeyCredentialTarget = "GeminiDesk:OpenAIApiKey";
+    private const string AnthropicApiKeyCredentialTarget = "GeminiDesk:AnthropicApiKey";
     private const string DefaultModelId = "gemini-3.5-flash";
     private const string LegacySolModelId = "gpt-5.6-sol";
     private const string StandardSolModelId = "gpt-5.6-sol-standard";
@@ -35,11 +36,13 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, WindowsCredentialStore> _apiKeyCredentialStores = new()
     {
         [ModelProvider.Google] = new WindowsCredentialStore(GoogleApiKeyCredentialTarget),
-        [ModelProvider.OpenAi] = new WindowsCredentialStore(OpenAiApiKeyCredentialTarget)
+        [ModelProvider.OpenAi] = new WindowsCredentialStore(OpenAiApiKeyCredentialTarget),
+        [ModelProvider.Anthropic] = new WindowsCredentialStore(AnthropicApiKeyCredentialTarget)
     };
     private readonly Dictionary<string, string> _apiKeys = new(StringComparer.Ordinal);
     private readonly HashSet<string> _rememberedApiKeyProviders = new(StringComparer.Ordinal);
     private readonly OpenAiResponsesService _openAiResponsesService = new();
+    private readonly AnthropicMessagesService _anthropicMessagesService = new();
     private readonly ImageGenerationService _imageGenerationService = new();
     private readonly AppUpdateService _appUpdateService = new();
     private readonly ChatStore _chatStore;
@@ -156,7 +159,7 @@ public partial class MainWindow : Window
                 {
                     Header = new TextBlock
                     {
-                        Text = model.Provider == ModelProvider.OpenAi ? "OPENAI GPT" : "GOOGLE GEMINI",
+                        Text = GetProviderMenuHeading(model.Provider),
                         FontSize = 9,
                         FontWeight = FontWeights.Bold,
                         Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush")
@@ -288,18 +291,35 @@ public partial class MainWindow : Window
             LegacySolModelId => "GPT-5.6 Sol",
             "gemini-3.1-flash-image" => "Nano Banana 2",
             "gpt-image-2" => "GPT Image 2",
+            "claude-opus-4-6" => "Claude Opus 4.6",
             _ => _modelOptions.FirstOrDefault(model => model.Id == modelId)?.DisplayName ?? modelId
         };
     }
 
+    private static string GetProviderMenuHeading(string provider) => provider switch
+    {
+        ModelProvider.OpenAi => "OPENAI GPT",
+        ModelProvider.Anthropic => "ANTHROPIC CLAUDE",
+        _ => "GOOGLE GEMINI"
+    };
+
     private void UpdateWebSearchAvailability(AiModelOption model)
     {
-        var supportsWebSearch = model.Provider == ModelProvider.Google || !model.IsImageGeneration;
+        var supportsWebSearch = SupportsWebSearch(model);
         WebSearchCheckBox.IsEnabled = _generationCancellation is null && supportsWebSearch;
         WebSearchCheckBox.ToolTip = supportsWebSearch
             ? null
-            : "GPT Image 2에서는 검색을 함께 사용할 수 없어요";
+            : model.Provider == ModelProvider.Anthropic
+                ? "Claude에서는 아직 검색을 함께 사용할 수 없어요"
+                : "GPT Image 2에서는 검색을 함께 사용할 수 없어요";
     }
+
+    private static bool SupportsWebSearch(AiModelOption model) => model.Provider switch
+    {
+        ModelProvider.Google => true,
+        ModelProvider.OpenAi => !model.IsImageGeneration,
+        _ => false
+    };
 
     private async void UpdateButton_Click(object sender, RoutedEventArgs e)
     {
@@ -596,7 +616,12 @@ public partial class MainWindow : Window
 
     private static string GetProviderDisplayName(string provider)
     {
-        return provider == ModelProvider.OpenAi ? "OpenAI" : "Gemini";
+        return provider switch
+        {
+            ModelProvider.OpenAi => "OpenAI",
+            ModelProvider.Anthropic => "Anthropic",
+            _ => "Gemini"
+        };
     }
 
     private void SetRememberApiKeyChecked(bool isChecked)
@@ -864,6 +889,18 @@ public partial class MainWindow : Window
                 collectedSources.AddRange(chunk.Sources);
             }
         }
+        else if (model.Provider == ModelProvider.Anthropic)
+        {
+            await foreach (var textDelta in _anthropicMessagesService.StreamResponseAsync(
+                               apiKey,
+                               model,
+                               requestContents,
+                               cancellationToken))
+            {
+                modelMessage.Text += textDelta;
+                ScrollToLatestMessage();
+            }
+        }
         else
         {
             var client = new Client(apiKey: apiKey);
@@ -912,7 +949,12 @@ public partial class MainWindow : Window
     {
         if (exception.Message.Contains("headers must contain only ASCII", StringComparison.OrdinalIgnoreCase))
         {
-            var keySource = provider == ModelProvider.OpenAi ? "OpenAI Platform" : "Google AI Studio";
+            var keySource = provider switch
+            {
+                ModelProvider.OpenAi => "OpenAI Platform",
+                ModelProvider.Anthropic => "Anthropic Console",
+                _ => "Google AI Studio"
+            };
             return $"API 키에 사용할 수 없는 문자가 포함되어 있습니다. 입력창을 비우고 {keySource}에서 키만 다시 복사해 주세요.";
         }
 
@@ -947,6 +989,27 @@ public partial class MainWindow : Window
             return false;
         }
 
+        if (model.Provider == ModelProvider.Anthropic)
+        {
+            var unsupportedClaudeAttachments = attachments
+                .Where(attachment => !IsClaudeAttachmentSupported(attachment.MimeType))
+                .Select(attachment => attachment.Name)
+                .ToList();
+
+            if (unsupportedClaudeAttachments.Count == 0)
+            {
+                return true;
+            }
+
+            MessageBox.Show(
+                $"Claude에는 PNG·JPG·GIF·WebP 이미지, PDF, 텍스트 문서를 첨부할 수 있어요.{System.Environment.NewLine}" +
+                $"BMP·오디오·동영상 파일은 빼 주세요: {string.Join(", ", unsupportedClaudeAttachments)}",
+                "Claude 첨부 형식 안내",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return false;
+        }
+
         if (model.Provider != ModelProvider.OpenAi)
         {
             return true;
@@ -972,6 +1035,18 @@ public partial class MainWindow : Window
             MessageBoxButton.OK,
             MessageBoxImage.Information);
         return false;
+    }
+
+    private static bool IsClaudeAttachmentSupported(string mimeType)
+    {
+        return mimeType.Equals("image/jpeg", StringComparison.OrdinalIgnoreCase) ||
+               mimeType.Equals("image/png", StringComparison.OrdinalIgnoreCase) ||
+               mimeType.Equals("image/gif", StringComparison.OrdinalIgnoreCase) ||
+               mimeType.Equals("image/webp", StringComparison.OrdinalIgnoreCase) ||
+               mimeType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) ||
+               mimeType.StartsWith("text/", StringComparison.OrdinalIgnoreCase) ||
+               mimeType.Equals("application/json", StringComparison.OrdinalIgnoreCase) ||
+               mimeType.Equals("application/xml", StringComparison.OrdinalIgnoreCase);
     }
 
     private void CompleteExchange(
@@ -2052,8 +2127,7 @@ public partial class MainWindow : Window
         AttachButton.IsEnabled = !isBusy && !isEditing;
         ClearAttachmentsButton.IsEnabled = !isBusy && !isEditing && _attachments.Count > 0;
         var selectedModel = GetSelectedModel();
-        WebSearchCheckBox.IsEnabled = !isBusy &&
-            (selectedModel.Provider == ModelProvider.Google || !selectedModel.IsImageGeneration);
+        WebSearchCheckBox.IsEnabled = !isBusy && SupportsWebSearch(selectedModel);
         ModelSelector.IsEnabled = !isBusy;
         UpdateButton.IsEnabled = !isBusy && !isEditing && !_isCheckingForUpdates && !_isDownloadingUpdate;
         ApiKeyBox.IsEnabled = !isBusy;
@@ -2166,6 +2240,7 @@ public sealed class ChatMessage : INotifyPropertyChanged
         "gpt-5.6-sol-flex" => "GPT-5.6 Sol Flex",
         "gemini-3.1-flash-image" => "Nano Banana 2",
         "gpt-image-2" => "GPT Image 2",
+        "claude-opus-4-6" => "Claude Opus 4.6",
         "gemini-2.5-flash" => "Gemini 2.5 Flash",
         "legacy-unknown" => "이전 응답 · 모델 정보 없음",
         null or "" => "이전 응답 · 모델 정보 없음",

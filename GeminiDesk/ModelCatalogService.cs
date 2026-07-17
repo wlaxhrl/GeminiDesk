@@ -9,6 +9,7 @@ public static class ModelProvider
 {
     public const string Google = "google";
     public const string OpenAi = "openai";
+    public const string Anthropic = "anthropic";
 }
 
 public static class ModelOutputKind
@@ -38,7 +39,7 @@ public sealed record AiModelOption
 
 public static class ModelCatalogService
 {
-    private const int CurrentSchemaVersion = 4;
+    private const int CurrentSchemaVersion = 5;
     private const string RemoteCatalogUrl =
         "https://raw.githubusercontent.com/wlaxhrl/GeminiDesk/main/models.json";
 
@@ -132,7 +133,7 @@ public static class ModelCatalogService
                !string.IsNullOrWhiteSpace(model.ShortName) &&
                !string.IsNullOrWhiteSpace(model.Icon) &&
                !string.IsNullOrWhiteSpace(model.Description) &&
-               model.Provider is ModelProvider.Google or ModelProvider.OpenAi &&
+               model.Provider is ModelProvider.Google or ModelProvider.OpenAi or ModelProvider.Anthropic &&
                (model.ApiModelId is null ||
                 (model.ApiModelId.Length <= 100 &&
                  model.ApiModelId.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.'))) &&
@@ -238,6 +239,18 @@ public static class ModelCatalogService
                 Description = "빠르고 고품질인 이미지 생성·편집 모델",
                 RequiresBilling = true,
                 OutputKind = ModelOutputKind.Image
+            },
+            new()
+            {
+                Id = "claude-opus-4-6",
+                Provider = ModelProvider.Anthropic,
+                DisplayName = "Claude Opus 4.6",
+                ShortName = "Opus 4.6",
+                Icon = "✺",
+                Badge = "OPUS",
+                Description = "가장 똑똑한 Claude · 복잡한 추론과 글쓰기에 강해요",
+                RequiresBilling = true,
+                ReasoningEffort = "high"
             }
         ];
     }

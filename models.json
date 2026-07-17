@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "models": [
     {
       "id": "gemini-3.5-flash",
@@ -87,6 +87,17 @@
       "description": "빠르고 고품질인 이미지 생성·편집 모델",
       "requiresBilling": true,
       "outputKind": "image"
+    },
+    {
+      "id": "claude-opus-4-6",
+      "provider": "anthropic",
+      "displayName": "Claude Opus 4.6",
+      "shortName": "Opus 4.6",
+      "icon": "✺",
+      "badge": "OPUS",
+      "description": "가장 똑똑한 Claude · 복잡한 추론과 글쓰기에 강해요",
+      "requiresBilling": true,
+      "reasoningEffort": "high"
     }
   ]
 }
