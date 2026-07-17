@@ -20,8 +20,10 @@
   <ItemGroup>
     <None Remove="Assets\bunny-guide.png" />
     <None Remove="Assets\bunny-mascot.png" />
+    <None Remove="Assets\bunny-model-guide.png" />
     <Resource Include="Assets\bunny-guide.png" />
     <Resource Include="Assets\bunny-mascot.png" />
+    <Resource Include="Assets\bunny-model-guide.png" />
   </ItemGroup>
 
   <ItemGroup>

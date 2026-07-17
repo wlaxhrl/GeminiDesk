@@ -505,6 +505,16 @@ public partial class MainWindow : Window
         ShowManualView();
     }
 
+    private void DetailedModelGuideButton_Click(object sender, RoutedEventArgs e)
+    {
+        ShowDetailedModelGuideView();
+    }
+
+    private void ModelGuideView_BackRequested(object sender, RoutedEventArgs e)
+    {
+        ShowManualView();
+    }
+
     private async void UsageButton_Click(object sender, RoutedEventArgs e)
     {
         ShowUsageView();
@@ -558,6 +568,7 @@ public partial class MainWindow : Window
         ChatView.Visibility = Visibility.Collapsed;
         UsageView.Visibility = Visibility.Collapsed;
         ManualView.Visibility = Visibility.Collapsed;
+        ModelGuideView.Visibility = Visibility.Collapsed;
         ApiKeySettingsView.Visibility = Visibility.Visible;
         ApiKeySettingsNotice.Text = notice ?? "키를 지운 채 저장하면 해당 키도 Windows에서 삭제돼요.";
         ApiKeySettingsView.ScrollToTop();
@@ -573,6 +584,7 @@ public partial class MainWindow : Window
         ApiKeySettingsView.Visibility = Visibility.Collapsed;
         UsageView.Visibility = Visibility.Collapsed;
         ManualView.Visibility = Visibility.Collapsed;
+        ModelGuideView.Visibility = Visibility.Collapsed;
         ChatView.Visibility = Visibility.Visible;
         PromptBox.Focus();
     }
@@ -582,6 +594,7 @@ public partial class MainWindow : Window
         ChatView.Visibility = Visibility.Collapsed;
         ApiKeySettingsView.Visibility = Visibility.Collapsed;
         ManualView.Visibility = Visibility.Collapsed;
+        ModelGuideView.Visibility = Visibility.Collapsed;
         UsageView.Visibility = Visibility.Visible;
         RefreshUsageView();
     }
@@ -591,9 +604,21 @@ public partial class MainWindow : Window
         ChatView.Visibility = Visibility.Collapsed;
         ApiKeySettingsView.Visibility = Visibility.Collapsed;
         UsageView.Visibility = Visibility.Collapsed;
+        ModelGuideView.Visibility = Visibility.Collapsed;
         ManualView.Visibility = Visibility.Visible;
         ManualView.ScrollToTop();
         ManualView.Focus();
+    }
+
+    private void ShowDetailedModelGuideView()
+    {
+        ChatView.Visibility = Visibility.Collapsed;
+        ApiKeySettingsView.Visibility = Visibility.Collapsed;
+        UsageView.Visibility = Visibility.Collapsed;
+        ManualView.Visibility = Visibility.Collapsed;
+        ModelGuideView.Visibility = Visibility.Visible;
+        ModelGuideView.ScrollToTop();
+        ModelGuideView.Focus();
     }
 
     private async Task RefreshExchangeRateAsync()
@@ -2497,6 +2522,7 @@ public partial class MainWindow : Window
         ModelSelector.IsEnabled = !isBusy;
         UpdateButton.IsEnabled = !isBusy && !isEditing && !_isCheckingForUpdates && !_isDownloadingUpdate;
         ManualButton.IsEnabled = !isBusy && !isEditing;
+        DetailedModelGuideButton.IsEnabled = !isBusy && !isEditing;
         ApiKeySettingsButton.IsEnabled = !isBusy && !isEditing;
         UsageButton.IsEnabled = !isBusy && !isEditing;
         CompareSubscriptionsButton.IsEnabled = !isBusy && !isEditing;

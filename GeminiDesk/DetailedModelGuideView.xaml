@@ -1,0 +1,565 @@
+<UserControl x:Class="GeminiDesk.DetailedModelGuideView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent"
+             FontFamily="Segoe UI Variable Text, Malgun Gothic">
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="InkBrush" Color="#FF29263B" />
+        <SolidColorBrush x:Key="MutedBrush" Color="#FF797487" />
+        <SolidColorBrush x:Key="PrimaryBrush" Color="#FF7567E8" />
+        <SolidColorBrush x:Key="PrimarySoftBrush" Color="#FFEDEAFF" />
+        <SolidColorBrush x:Key="BorderBrush" Color="#FFE9E5F1" />
+
+        <Style x:Key="BackButton" TargetType="Button">
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="Background" Value="White" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="13">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.84" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.68" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ModelCard" TargetType="Border">
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="Padding" Value="20,18" />
+            <Setter Property="Background" Value="White" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="18" />
+        </Style>
+
+        <Style x:Key="SlimScrollBar" TargetType="ScrollBar">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="MinWidth" Value="8" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Width="8" Background="Transparent">
+                            <Track x:Name="PART_Track"
+                                   Focusable="False"
+                                   IsDirectionReversed="True"
+                                   Orientation="Vertical">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                                  Focusable="False"
+                                                  Opacity="0" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb MinHeight="28" Margin="1,0" Cursor="Hand">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border x:Name="ThumbBody"
+                                                        Background="#707567E8"
+                                                        CornerRadius="3" />
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="ThumbBody"
+                                                                Property="Background"
+                                                                Value="#B07567E8" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="ThumbBody"
+                                                                Property="Background"
+                                                                Value="#DD7567E8" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                                  Focusable="False"
+                                                  Opacity="0" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer x:Name="GuideScrollViewer"
+                  Margin="28,22,28,18"
+                  HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
+        <ScrollViewer.Resources>
+            <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimScrollBar}" />
+        </ScrollViewer.Resources>
+
+        <StackPanel MaxWidth="900" HorizontalAlignment="Center">
+            <Grid Margin="2,0,2,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock FontSize="27"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource InkBrush}"
+                               Text="상세 모델 가이드" />
+                    <TextBlock Margin="1,6,0,0"
+                               Foreground="{StaticResource MutedBrush}"
+                               Text="가격, 성격, 잘하는 일을 한눈에 비교해요" />
+                </StackPanel>
+                <Button Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource BackButton}"
+                        Click="BackButton_Click"
+                        Content="←  사용법으로 돌아가기" />
+            </Grid>
+
+            <Border Padding="22,18,22,13"
+                    Background="#FFF0FBF6"
+                    CornerRadius="25">
+                <StackPanel>
+                    <Border Padding="10,5"
+                            HorizontalAlignment="Center"
+                            Background="#B8FFFFFF"
+                            CornerRadius="10">
+                        <TextBlock FontSize="10"
+                                   FontWeight="Bold"
+                                   Foreground="#FF3F9775"
+                                   Text="GEMINI · GPT · CLAUDE" />
+                    </Border>
+                    <Image Height="390"
+                           Margin="0,-20,0,-24"
+                           Stretch="Uniform"
+                           Source="/GeminiDesk;component/Assets/bunny-model-guide.png" />
+                    <TextBlock HorizontalAlignment="Center"
+                               FontSize="11"
+                               Foreground="#FF5D7B70"
+                               Text="표시 가격은 100만 토큰당 USD 기준이에요 · input / output 순서" />
+                </StackPanel>
+            </Border>
+
+            <DockPanel Margin="3,25,3,11" LastChildFill="False">
+                <Border Width="9"
+                        Height="9"
+                        Margin="0,0,8,0"
+                        VerticalAlignment="Center"
+                        Background="#FF74B8E3"
+                        CornerRadius="5" />
+                <TextBlock VerticalAlignment="Center"
+                           FontSize="20"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource InkBrush}"
+                           Text="Google Gemini" />
+            </DockPanel>
+
+            <Border Style="{StaticResource ModelCard}" Background="#FFF5FAFF">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <DockPanel LastChildFill="False">
+                        <TextBlock VerticalAlignment="Center"
+                                   FontSize="17"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource InkBrush}"
+                                   Text="Gemini 3.5 Flash" />
+                        <Border DockPanel.Dock="Right"
+                                Padding="10,5"
+                                Background="#FFE2F3FF"
+                                CornerRadius="9">
+                            <TextBlock FontSize="10.5"
+                                       FontWeight="Bold"
+                                       Foreground="#FF347FAE"
+                                       Text="input $1.50  /  output $9" />
+                        </Border>
+                    </DockPanel>
+                    <TextBlock Grid.Row="1"
+                               Margin="0,9,0,0"
+                               FontSize="12.5"
+                               Foreground="{StaticResource InkBrush}"
+                               LineHeight="21"
+                               Text="빠르게 많은 작업을 처리하면서도 추론 능력이 좋은 실무형"
+                               TextWrapping="Wrap" />
+                    <Grid Grid.Row="2" Margin="0,9,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Padding="8,3"
+                                VerticalAlignment="Top"
+                                Background="#FFFFFFFF"
+                                CornerRadius="7">
+                            <TextBlock FontSize="9.5"
+                                       FontWeight="Bold"
+                                       Foreground="#FF347FAE"
+                                       Text="활용 예시" />
+                        </Border>
+                        <TextBlock Grid.Column="1"
+                                   Margin="10,1,0,0"
+                                   FontSize="11"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   LineHeight="19"
+                                   Text="문서 요약, 번역, 자료 분류, 챗봇, 이미지·영상 분석, 대량 콘텐츠 처리"
+                                   TextWrapping="Wrap" />
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource ModelCard}" Background="#FFF5FAFF">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <DockPanel LastChildFill="False">
+                        <TextBlock VerticalAlignment="Center"
+                                   FontSize="17"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource InkBrush}"
+                                   Text="Gemini 3.1 Pro" />
+                        <Border DockPanel.Dock="Right"
+                                Padding="10,5"
+                                Background="#FFE2F3FF"
+                                CornerRadius="9">
+                            <TextBlock FontSize="10"
+                                       FontWeight="Bold"
+                                       Foreground="#FF347FAE"
+                                       Text="20만 이하 $2 / $12  ·  20만 초과 $4 / $18" />
+                        </Border>
+                    </DockPanel>
+                    <TextBlock Grid.Row="1"
+                               Margin="0,9,0,0"
+                               FontSize="12.5"
+                               Foreground="{StaticResource InkBrush}"
+                               LineHeight="21"
+                               Text="긴 자료와 이미지·영상까지 종합해 복잡한 문제를 분석하는 고급형"
+                               TextWrapping="Wrap" />
+                    <Grid Grid.Row="2" Margin="0,9,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Padding="8,3"
+                                VerticalAlignment="Top"
+                                Background="#FFFFFFFF"
+                                CornerRadius="7">
+                            <TextBlock FontSize="9.5"
+                                       FontWeight="Bold"
+                                       Foreground="#FF347FAE"
+                                       Text="활용 예시" />
+                        </Border>
+                        <TextBlock Grid.Column="1"
+                                   Margin="10,1,0,0"
+                                   FontSize="11"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   LineHeight="19"
+                                   Text="논문·보고서 분석, 긴 영상 이해, 심층 리서치, 복잡한 기획, 어려운 문제 해결"
+                                   TextWrapping="Wrap" />
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <DockPanel Margin="3,22,3,11" LastChildFill="False">
+                <Border Width="9"
+                        Height="9"
+                        Margin="0,0,8,0"
+                        VerticalAlignment="Center"
+                        Background="#FF54BF95"
+                        CornerRadius="5" />
+                <TextBlock VerticalAlignment="Center"
+                           FontSize="20"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource InkBrush}"
+                           Text="OpenAI GPT" />
+            </DockPanel>
+
+            <Border Style="{StaticResource ModelCard}" Background="#FFF3FBF7">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <DockPanel LastChildFill="False">
+                        <TextBlock VerticalAlignment="Center"
+                                   FontSize="17"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource InkBrush}"
+                                   Text="GPT-5.6 Terra" />
+                        <Border DockPanel.Dock="Right"
+                                Padding="10,5"
+                                Background="#FFDFF7EC"
+                                CornerRadius="9">
+                            <TextBlock FontSize="10.5"
+                                       FontWeight="Bold"
+                                       Foreground="#FF268865"
+                                       Text="input $2.50  /  output $15" />
+                        </Border>
+                    </DockPanel>
+                    <TextBlock Grid.Row="1"
+                               Margin="0,9,0,0"
+                               FontSize="12.5"
+                               Foreground="{StaticResource InkBrush}"
+                               LineHeight="21"
+                               Text="가격·속도·지능의 균형이 좋은 만능 실무형"
+                               TextWrapping="Wrap" />
+                    <Grid Grid.Row="2" Margin="0,9,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Padding="8,3"
+                                VerticalAlignment="Top"
+                                Background="#FFFFFFFF"
+                                CornerRadius="7">
+                            <TextBlock FontSize="9.5"
+                                       FontWeight="Bold"
+                                       Foreground="#FF268865"
+                                       Text="활용 예시" />
+                        </Border>
+                        <TextBlock Grid.Column="1"
+                                   Margin="10,1,0,0"
+                                   FontSize="11"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   LineHeight="19"
+                                   Text="이메일, 보고서, 기획서, 공부, 리서치, 일반 개발, 대부분의 일상·업무 작업"
+                                   TextWrapping="Wrap" />
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource ModelCard}" Background="#FFF3FBF7">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <DockPanel LastChildFill="False">
+                        <TextBlock VerticalAlignment="Center"
+                                   FontSize="17"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource InkBrush}"
+                                   Text="GPT-5.6 Luna" />
+                        <Border DockPanel.Dock="Right"
+                                Padding="10,5"
+                                Background="#FFDFF7EC"
+                                CornerRadius="9">
+                            <TextBlock FontSize="10.5"
+                                       FontWeight="Bold"
+                                       Foreground="#FF268865"
+                                       Text="input $1  /  output $6" />
+                        </Border>
+                    </DockPanel>
+                    <TextBlock Grid.Row="1"
+                               Margin="0,9,0,0"
+                               FontSize="12.5"
+                               Foreground="{StaticResource InkBrush}"
+                               LineHeight="21"
+                               Text="GPT-5.6 중 가장 빠르고 저렴한 경량형"
+                               TextWrapping="Wrap" />
+                    <Grid Grid.Row="2" Margin="0,9,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Padding="8,3"
+                                VerticalAlignment="Top"
+                                Background="#FFFFFFFF"
+                                CornerRadius="7">
+                            <TextBlock FontSize="9.5"
+                                       FontWeight="Bold"
+                                       Foreground="#FF268865"
+                                       Text="활용 예시" />
+                        </Border>
+                        <TextBlock Grid.Column="1"
+                                   Margin="10,1,0,0"
+                                   FontSize="11"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   LineHeight="19"
+                                   Text="간단한 질문, 요약, 번역, 정보 추출, 형식 변환, 반복 작업과 대량 자동화"
+                                   TextWrapping="Wrap" />
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource ModelCard}"
+                    Background="#FFECF9F3"
+                    BorderBrush="#FFBDE8D5">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <DockPanel LastChildFill="False">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock VerticalAlignment="Center"
+                                       FontSize="17"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource InkBrush}"
+                                       Text="GPT-5.6 Sol" />
+                            <Border Margin="8,0,0,0"
+                                    Padding="7,3"
+                                    Background="#FFFFFFFF"
+                                    CornerRadius="7">
+                                <TextBlock FontSize="9"
+                                           FontWeight="Bold"
+                                           Foreground="#FF268865"
+                                           Text="최고급" />
+                            </Border>
+                        </StackPanel>
+                        <Border DockPanel.Dock="Right"
+                                Padding="10,5"
+                                Background="#FFD5F2E5"
+                                CornerRadius="9">
+                            <TextBlock FontSize="10.5"
+                                       FontWeight="Bold"
+                                       Foreground="#FF217A5B"
+                                       Text="Standard $5 / $30  ·  Flex $2.50 / $15" />
+                        </Border>
+                    </DockPanel>
+                    <TextBlock Grid.Row="1"
+                               Margin="0,9,0,0"
+                               FontSize="12.5"
+                               Foreground="{StaticResource InkBrush}"
+                               LineHeight="21"
+                               Text="복잡한 문제와 긴 작업을 끝까지 해결하는 최고급 만능형. Standard는 빠르고, Flex는 느리지만 반값이에요."
+                               TextWrapping="Wrap" />
+                    <Grid Grid.Row="2" Margin="0,9,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Padding="8,3"
+                                VerticalAlignment="Top"
+                                Background="#FFFFFFFF"
+                                CornerRadius="7">
+                            <TextBlock FontSize="9.5"
+                                       FontWeight="Bold"
+                                       Foreground="#FF217A5B"
+                                       Text="활용 예시" />
+                        </Border>
+                        <TextBlock Grid.Column="1"
+                                   Margin="10,1,0,0"
+                                   FontSize="11"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   LineHeight="19"
+                                   Text="심층 리서치, 중요한 의사결정, 복잡한 개발, 여러 자료를 활용한 분석, PPT·보고서·재무 문서 제작"
+                                   TextWrapping="Wrap" />
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <DockPanel Margin="3,22,3,11" LastChildFill="False">
+                <Border Width="9"
+                        Height="9"
+                        Margin="0,0,8,0"
+                        VerticalAlignment="Center"
+                        Background="#FFF28B70"
+                        CornerRadius="5" />
+                <TextBlock VerticalAlignment="Center"
+                           FontSize="20"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource InkBrush}"
+                           Text="Anthropic Claude" />
+            </DockPanel>
+
+            <Border Style="{StaticResource ModelCard}"
+                    Background="#FFFFF4F0"
+                    BorderBrush="#FFFFD7CB">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <DockPanel LastChildFill="False">
+                        <TextBlock VerticalAlignment="Center"
+                                   FontSize="17"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource InkBrush}"
+                                   Text="Claude Opus 4.6" />
+                        <Border DockPanel.Dock="Right"
+                                Padding="10,5"
+                                Background="#FFFFE4DA"
+                                CornerRadius="9">
+                            <TextBlock FontSize="10.5"
+                                       FontWeight="Bold"
+                                       Foreground="#FFB65B42"
+                                       Text="input $5  /  output $25" />
+                        </Border>
+                    </DockPanel>
+                    <TextBlock Grid.Row="1"
+                               Margin="0,9,0,0"
+                               FontSize="12.5"
+                               Foreground="{StaticResource InkBrush}"
+                               LineHeight="21"
+                               Text="섬세한 말투와 감정·맥락 이해가 돋보이는 문과형"
+                               TextWrapping="Wrap" />
+                    <Grid Grid.Row="2" Margin="0,9,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Padding="8,3"
+                                VerticalAlignment="Top"
+                                Background="#FFFFFFFF"
+                                CornerRadius="7">
+                            <TextBlock FontSize="9.5"
+                                       FontWeight="Bold"
+                                       Foreground="#FFB65B42"
+                                       Text="활용 예시" />
+                        </Border>
+                        <TextBlock Grid.Column="1"
+                                   Margin="10,1,0,0"
+                                   FontSize="11"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   LineHeight="19"
+                                   Text="상담과 고민 대화, 소설·시나리오, 캐릭터 대화, 감성적인 글쓰기, 문장 다듬기, 긴 글의 분위기 유지"
+                                   TextWrapping="Wrap" />
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border Margin="0,7,0,4"
+                    Padding="16,13"
+                    Background="#FFFFFFFF"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="15">
+                <TextBlock HorizontalAlignment="Center"
+                           FontSize="10.5"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="가격은 모델 제공사의 정책에 따라 바뀔 수 있어요 · 실제 청구 전 각 제공사 가격표도 확인해 주세요"
+                           TextWrapping="Wrap" />
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
