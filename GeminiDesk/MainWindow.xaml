@@ -420,50 +420,65 @@
             </Grid.RowDefinitions>
 
             <DockPanel Grid.Row="0" Margin="2,0,2,18">
-                <StackPanel x:Name="ModelSelector"
-                            DockPanel.Dock="Right"
+                <StackPanel DockPanel.Dock="Right"
                             Margin="18,0,0,0"
+                            Orientation="Horizontal"
                             VerticalAlignment="Center">
-                    <TextBlock Margin="5,0,0,4"
-                               FontSize="10"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource MutedBrush}"
-                               Text="사용할 모델" />
-                    <Button x:Name="ModelMenuButton"
-                            AutomationProperties.Name="사용할 AI 모델 선택"
-                            Click="ModelMenuButton_Click"
-                            Style="{StaticResource ModelPickerButton}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock x:Name="SelectedModelIcon"
-                                       Margin="0,0,6,0"
-                                       VerticalAlignment="Center"
-                                       FontSize="12"
-                                       Text="⚡" />
-                            <TextBlock x:Name="SelectedModelName"
-                                       VerticalAlignment="Center"
-                                       FontFamily="Segoe UI Variable Text, Malgun Gothic"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Text="3.5 Flash" />
-                            <Border x:Name="SelectedModelBadge"
-                                    Margin="7,0,0,0"
-                                    Padding="5,1"
-                                    VerticalAlignment="Center"
-                                    Background="#FFFFEDF4"
-                                    CornerRadius="6"
-                                    Visibility="Collapsed">
-                                <TextBlock x:Name="SelectedModelBadgeText"
-                                           FontSize="8"
-                                           FontWeight="Bold"
-                                           Foreground="#FFB04C75" />
-                            </Border>
-                            <TextBlock Margin="8,-2,0,0"
-                                       VerticalAlignment="Center"
-                                       FontSize="13"
-                                       Foreground="{StaticResource MutedBrush}"
-                                       Text="⌄" />
-                        </StackPanel>
-                    </Button>
+                    <StackPanel x:Name="ModelSelector" VerticalAlignment="Center">
+                        <TextBlock Margin="5,0,0,4"
+                                   FontSize="10"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Text="사용할 모델" />
+                        <Button x:Name="ModelMenuButton"
+                                AutomationProperties.Name="사용할 AI 모델 선택"
+                                Click="ModelMenuButton_Click"
+                                Style="{StaticResource ModelPickerButton}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="SelectedModelIcon"
+                                           Margin="0,0,6,0"
+                                           VerticalAlignment="Center"
+                                           FontSize="12"
+                                           Text="⚡" />
+                                <TextBlock x:Name="SelectedModelName"
+                                           VerticalAlignment="Center"
+                                           FontFamily="Segoe UI Variable Text, Malgun Gothic"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Text="3.5 Flash" />
+                                <Border x:Name="SelectedModelBadge"
+                                        Margin="7,0,0,0"
+                                        Padding="5,1"
+                                        VerticalAlignment="Center"
+                                        Background="#FFFFEDF4"
+                                        CornerRadius="6"
+                                        Visibility="Collapsed">
+                                    <TextBlock x:Name="SelectedModelBadgeText"
+                                               FontSize="8"
+                                               FontWeight="Bold"
+                                               Foreground="#FFB04C75" />
+                                </Border>
+                                <TextBlock Margin="8,-2,0,0"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{StaticResource MutedBrush}"
+                                           Text="⌄" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <Button x:Name="ChatModelGuideButton"
+                            Width="34"
+                            Height="40"
+                            Margin="6,18,0,0"
+                            Padding="0"
+                            VerticalAlignment="Top"
+                            AutomationProperties.Name="상세 모델 가이드"
+                            Style="{StaticResource SoftButton}"
+                            Click="DetailedModelGuideButton_Click"
+                            Content="?"
+                            FontSize="13"
+                            FontWeight="Bold"
+                            ToolTip="상세 모델 가이드" />
                 </StackPanel>
                 <StackPanel>
                     <TextBlock FontSize="27"

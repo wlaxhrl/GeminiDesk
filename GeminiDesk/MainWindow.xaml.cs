@@ -2520,6 +2520,7 @@ public partial class MainWindow : Window
         var selectedModel = GetSelectedModel();
         WebSearchCheckBox.IsEnabled = !isBusy && SupportsWebSearch(selectedModel);
         ModelSelector.IsEnabled = !isBusy;
+        ChatModelGuideButton.IsEnabled = !isBusy && !isEditing;
         UpdateButton.IsEnabled = !isBusy && !isEditing && !_isCheckingForUpdates && !_isDownloadingUpdate;
         ManualButton.IsEnabled = !isBusy && !isEditing;
         DetailedModelGuideButton.IsEnabled = !isBusy && !isEditing;
