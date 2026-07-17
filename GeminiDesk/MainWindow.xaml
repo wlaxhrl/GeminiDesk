@@ -211,11 +211,12 @@
 
                 <StackPanel Orientation="Horizontal" Margin="2,4,0,20">
                     <Border Width="42" Height="42" Background="{StaticResource PrimaryBrush}" CornerRadius="15">
-                        <TextBlock HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   FontSize="21"
-                                   Foreground="White"
-                                   Text="🐇" />
+                        <Image Width="34"
+                               Height="34"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Stretch="Uniform"
+                               Source="/GeminiDesk;component/Assets/bunny-mascot.png" />
                     </Border>
                     <StackPanel Margin="11,1,0,0">
                         <TextBlock FontSize="19"
@@ -1192,11 +1193,13 @@
                             Padding="15,10"
                             VerticalAlignment="Center"
                             Background="#2AFFFFFF"
-                            CornerRadius="15">
+                        CornerRadius="15">
                         <StackPanel HorizontalAlignment="Center">
-                            <TextBlock HorizontalAlignment="Center"
-                                       FontSize="19"
-                                       Text="🐰" />
+                            <Image Width="32"
+                                   Height="32"
+                                   HorizontalAlignment="Center"
+                                   Stretch="Uniform"
+                                   Source="/GeminiDesk;component/Assets/bunny-mascot.png" />
                             <TextBlock x:Name="UsageRequestCountText"
                                        Margin="0,4,0,0"
                                        HorizontalAlignment="Center"

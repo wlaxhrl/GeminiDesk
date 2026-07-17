@@ -64,10 +64,18 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock FontSize="25"
-                           FontWeight="Bold"
-                           Foreground="{StaticResource InkBrush}"
-                           Text="구독과 비교하기 🐰" />
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock FontSize="25"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource InkBrush}"
+                               Text="구독과 비교하기" />
+                    <Image Width="32"
+                           Height="32"
+                           Margin="8,-2,0,0"
+                           VerticalAlignment="Center"
+                           Stretch="Uniform"
+                           Source="/GeminiDesk;component/Assets/bunny-mascot.png" />
+                </StackPanel>
                 <TextBlock x:Name="ComparisonMonthText"
                            Margin="1,6,0,0"
                            FontSize="12"

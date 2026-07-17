@@ -18,6 +18,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="Assets\bunny-mascot.png" />
+    <Resource Include="Assets\bunny-mascot.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="..\models.json"
           Link="models.json"
           CopyToOutputDirectory="PreserveNewest"
