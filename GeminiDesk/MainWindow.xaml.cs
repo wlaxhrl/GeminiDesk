@@ -500,6 +500,11 @@ public partial class MainWindow : Window
         ShowApiKeySettings();
     }
 
+    private void ManualButton_Click(object sender, RoutedEventArgs e)
+    {
+        ShowManualView();
+    }
+
     private async void UsageButton_Click(object sender, RoutedEventArgs e)
     {
         ShowUsageView();
@@ -552,6 +557,7 @@ public partial class MainWindow : Window
         RefreshApiKeySettingsFields();
         ChatView.Visibility = Visibility.Collapsed;
         UsageView.Visibility = Visibility.Collapsed;
+        ManualView.Visibility = Visibility.Collapsed;
         ApiKeySettingsView.Visibility = Visibility.Visible;
         ApiKeySettingsNotice.Text = notice ?? "키를 지운 채 저장하면 해당 키도 Windows에서 삭제돼요.";
         ApiKeySettingsView.ScrollToTop();
@@ -566,6 +572,7 @@ public partial class MainWindow : Window
     {
         ApiKeySettingsView.Visibility = Visibility.Collapsed;
         UsageView.Visibility = Visibility.Collapsed;
+        ManualView.Visibility = Visibility.Collapsed;
         ChatView.Visibility = Visibility.Visible;
         PromptBox.Focus();
     }
@@ -574,8 +581,19 @@ public partial class MainWindow : Window
     {
         ChatView.Visibility = Visibility.Collapsed;
         ApiKeySettingsView.Visibility = Visibility.Collapsed;
+        ManualView.Visibility = Visibility.Collapsed;
         UsageView.Visibility = Visibility.Visible;
         RefreshUsageView();
+    }
+
+    private void ShowManualView()
+    {
+        ChatView.Visibility = Visibility.Collapsed;
+        ApiKeySettingsView.Visibility = Visibility.Collapsed;
+        UsageView.Visibility = Visibility.Collapsed;
+        ManualView.Visibility = Visibility.Visible;
+        ManualView.ScrollToTop();
+        ManualView.Focus();
     }
 
     private async Task RefreshExchangeRateAsync()
@@ -2478,6 +2496,7 @@ public partial class MainWindow : Window
         WebSearchCheckBox.IsEnabled = !isBusy && SupportsWebSearch(selectedModel);
         ModelSelector.IsEnabled = !isBusy;
         UpdateButton.IsEnabled = !isBusy && !isEditing && !_isCheckingForUpdates && !_isDownloadingUpdate;
+        ManualButton.IsEnabled = !isBusy && !isEditing;
         ApiKeySettingsButton.IsEnabled = !isBusy && !isEditing;
         UsageButton.IsEnabled = !isBusy && !isEditing;
         CompareSubscriptionsButton.IsEnabled = !isBusy && !isEditing;

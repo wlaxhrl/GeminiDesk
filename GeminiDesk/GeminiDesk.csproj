@@ -18,7 +18,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="Assets\bunny-guide.png" />
     <None Remove="Assets\bunny-mascot.png" />
+    <Resource Include="Assets\bunny-guide.png" />
     <Resource Include="Assets\bunny-mascot.png" />
   </ItemGroup>
 

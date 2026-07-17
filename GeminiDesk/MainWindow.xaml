@@ -388,6 +388,19 @@
                                 Content="업데이트 확인"
                                 FontSize="10"
                                 Style="{StaticResource SoftButton}" />
+                        <Button x:Name="ManualButton"
+                                DockPanel.Dock="Right"
+                                Width="28"
+                                Height="28"
+                                Margin="0,0,6,0"
+                                Padding="0"
+                                AutomationProperties.Name="Bunny Desk 사용법"
+                                Click="ManualButton_Click"
+                                Content="?"
+                                FontSize="13"
+                                FontWeight="Bold"
+                                Style="{StaticResource SoftButton}"
+                                ToolTip="Bunny Desk 사용법" />
                     </DockPanel>
                     <TextBlock x:Name="UpdateDetailText"
                                Margin="0,5,0,0"
@@ -1396,5 +1409,341 @@
                        Foreground="#FFA39EAD"
                        Text="공식 단가 기준 예상치예요 · 무료 한도, 세금, 환율 변동은 실제 청구와 다를 수 있어요" />
         </Grid>
+
+        <ScrollViewer x:Name="ManualView"
+                      Grid.Column="1"
+                      Margin="28,22,28,18"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      Visibility="Collapsed">
+            <ScrollViewer.Resources>
+                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimScrollBar}" />
+            </ScrollViewer.Resources>
+
+            <StackPanel MaxWidth="900" HorizontalAlignment="Center">
+                <Grid Margin="2,0,2,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock FontSize="27"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource InkBrush}"
+                                   Text="Bunny Desk 사용법" />
+                        <TextBlock Margin="1,6,0,0"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Text="처음 쓰기 전에 꼭 알아둘 것만 토끼 선생님이 알려드려요 ✨" />
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            Height="38"
+                            Padding="14,6"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource PillButton}"
+                            Click="BackToChatButton_Click"
+                            Content="←  채팅으로 돌아가기" />
+                </Grid>
+
+                <Border Padding="24"
+                        Background="#FFFFEFF6"
+                        CornerRadius="25">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="18"
+                                          Opacity="0.07"
+                                          ShadowDepth="4"
+                                          Color="#FF9B5577" />
+                    </Border.Effect>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="220" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="210"
+                                Height="210"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Background="#80FFFFFF"
+                                CornerRadius="28">
+                            <Image Margin="-7"
+                                   Stretch="Uniform"
+                                   Source="/GeminiDesk;component/Assets/bunny-guide.png" />
+                        </Border>
+                        <StackPanel Grid.Column="1"
+                                    Margin="24,0,0,0"
+                                    VerticalAlignment="Center">
+                            <Border Padding="9,4"
+                                    HorizontalAlignment="Left"
+                                    Background="#FFFFFFFF"
+                                    CornerRadius="9">
+                                <TextBlock FontSize="9.5"
+                                           FontWeight="Bold"
+                                           Foreground="#FFB04C75"
+                                           Text="BUNNY DESK GUIDE" />
+                            </Border>
+                            <TextBlock Margin="0,12,0,0"
+                                       FontSize="23"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource InkBrush}"
+                                       Text="토끼 선생님의 1분 안내" />
+                            <TextBlock Margin="0,9,0,0"
+                                       FontSize="12.5"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       LineHeight="22"
+                                       Text="API는 공홈 구독과 사용 방식이 달라요.&#10;키를 안전하게 지키고, 대화 주제마다 새 채팅을 만드는 것부터 시작해요."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <TextBlock Margin="3,25,3,11"
+                           FontSize="20"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource InkBrush}"
+                           Text="꼭 읽어주세요" />
+
+                <Border Margin="0,0,0,10"
+                        Padding="18"
+                        Background="#FFFFEDF2"
+                        BorderBrush="#FFFFD0DC"
+                        BorderThickness="1"
+                        CornerRadius="17">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="44" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock HorizontalAlignment="Center"
+                                   VerticalAlignment="Top"
+                                   FontSize="22"
+                                   Text="🔐" />
+                        <StackPanel Grid.Column="1">
+                            <TextBlock FontSize="14"
+                                       FontWeight="Bold"
+                                       Foreground="#FF9A3F5A"
+                                       Text="API KEY는 비밀번호처럼 다뤄주세요" />
+                            <TextBlock Margin="0,5,0,0"
+                                       FontSize="12"
+                                       Foreground="{StaticResource InkBrush}"
+                                       LineHeight="21"
+                                       Text="API KEY와 KEY PRESET 파일은 절대로 남에게 공유하지 마세요."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Margin="0,0,0,10"
+                        Padding="18"
+                        Background="#FFF5F3FF"
+                        CornerRadius="17">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="44" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock HorizontalAlignment="Center"
+                                   VerticalAlignment="Top"
+                                   FontSize="22"
+                                   Text="💳" />
+                        <StackPanel Grid.Column="1">
+                            <TextBlock FontSize="14"
+                                       FontWeight="Bold"
+                                       Foreground="#FF5D51C6"
+                                       Text="공홈 구독과 API 사용은 많이 달라요" />
+                            <TextBlock Margin="0,5,0,0"
+                                       FontSize="12"
+                                       Foreground="{StaticResource InkBrush}"
+                                       LineHeight="21"
+                                       Text="Bunny Desk는 API를 사용하는 프로그램이에요. 요청마다 입력·출력 토큰(문자와 단어를 잘게 나눈 단위) 등의 사용량으로 비용이 매겨지고 모델마다 가격도 달라요. 각 플랫폼 공홈의 편리한 기능을 연동할 수 없으며, AI는 다른 채팅방의 당신에 관한 정보를 기억하지 않아요. 채팅방(세션)이 바뀌면 AI도 새로 시작해요."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Margin="0,0,0,10"
+                        Padding="18"
+                        Background="#FFFFF8E8"
+                        CornerRadius="17">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="44" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock HorizontalAlignment="Center"
+                                   VerticalAlignment="Top"
+                                   FontSize="22"
+                                   Text="🧹" />
+                        <StackPanel Grid.Column="1">
+                            <TextBlock FontSize="14"
+                                       FontWeight="Bold"
+                                       Foreground="#FF9C6B14"
+                                       Text="한 채팅방에 모든 대화를 쌓지 마세요" />
+                            <TextBlock Margin="0,5,0,0"
+                                       FontSize="12"
+                                       Foreground="{StaticResource InkBrush}"
+                                       LineHeight="21"
+                                       Text="대화가 길어질수록 함께 보내는 문맥도 늘어나 요금이 비싸질 수 있어요. 하나의 대화 주제가 끝나면 새 채팅방을 만드는 습관을 들이면 좋아요."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <UniformGrid Columns="3" Margin="-5,0,-5,0">
+                    <Border Margin="5"
+                            Padding="16"
+                            Background="#FFF0F8FF"
+                            CornerRadius="17">
+                        <StackPanel>
+                            <TextBlock FontSize="21" Text="✨" />
+                            <TextBlock Margin="0,8,0,0"
+                                       FontSize="13"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource InkBrush}"
+                                       Text="새 모델 업데이트" />
+                            <TextBlock Margin="0,5,0,0"
+                                       FontSize="11"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       LineHeight="19"
+                                       Text="새 모델이 출시되면 재설치 없이 제작자가 원격으로 목록을 업데이트할 수 있어요."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                    <Border Margin="5"
+                            Padding="16"
+                            Background="#FFF4F1FF"
+                            CornerRadius="17">
+                        <StackPanel>
+                            <TextBlock FontSize="21" Text="🧠" />
+                            <TextBlock Margin="0,8,0,0"
+                                       FontSize="13"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource InkBrush}"
+                                       Text="Gemini 3.1 Pro" />
+                            <TextBlock Margin="0,5,0,0"
+                                       FontSize="11"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       LineHeight="19"
+                                       Text="추론 강도를 최대로 설정해 두었어요."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                    <Border Margin="5"
+                            Padding="16"
+                            Background="#FFFFF0F5"
+                            CornerRadius="17">
+                        <StackPanel>
+                            <TextBlock FontSize="21" Text="✍️" />
+                            <TextBlock Margin="0,8,0,0"
+                                       FontSize="13"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource InkBrush}"
+                                       Text="Claude Opus 4.6" />
+                            <TextBlock Margin="0,5,0,0"
+                                       FontSize="11"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       LineHeight="19"
+                                       Text="타사 대비 가격·성능 메리트가 크지 않다고 판단해, 제일 귀여운 Opus 4.6만 제공해요."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
+                <TextBlock Margin="3,25,3,11"
+                           FontSize="20"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource InkBrush}"
+                           Text="모델 선택 가이드" />
+
+                <UniformGrid Columns="2" Margin="-5,0,-5,0">
+                    <Border Margin="5"
+                            Padding="18"
+                            Background="#FFFFF8E8"
+                            CornerRadius="18">
+                        <StackPanel>
+                            <TextBlock FontSize="22" Text="⚡" />
+                            <TextBlock Margin="0,8,0,0"
+                                       FontSize="15"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource InkBrush}"
+                                       Text="간단한 작업" />
+                            <TextBlock Margin="0,6,0,0"
+                                       FontSize="11.5"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       LineHeight="20"
+                                       Text="Gemini 공홈에서 3.5 Flash를 무료로 사용하세요. Bunny Desk에서는 가장 저렴한 GPT Luna도 좋아요."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                    <Border Margin="5"
+                            Padding="18"
+                            Background="#FFF0F8FF"
+                            CornerRadius="18">
+                        <StackPanel>
+                            <TextBlock FontSize="22" Text="🌎" />
+                            <TextBlock Margin="0,8,0,0"
+                                       FontSize="15"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource InkBrush}"
+                                       Text="범용 작업" />
+                            <TextBlock Margin="0,6,0,0"
+                                       FontSize="11.5"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       LineHeight="20"
+                                       Text="어디에나 무난하게 쓰기 좋은 균형형 모델은 GPT Terra예요."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                    <Border Margin="5"
+                            Padding="18"
+                            Background="#FFF4F1FF"
+                            CornerRadius="18">
+                        <StackPanel>
+                            <TextBlock FontSize="22" Text="🧩" />
+                            <TextBlock Margin="0,8,0,0"
+                                       FontSize="15"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource InkBrush}"
+                                       Text="추론이 필요한 작업" />
+                            <TextBlock Margin="0,6,0,0"
+                                       FontSize="11.5"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       LineHeight="20"
+                                       Text="Gemini 3.1 Pro 또는 GPT Sol을 사용하세요. GPT가 훨씬 똑똑하지만 조금 더 비싸요."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                    <Border Margin="5"
+                            Padding="18"
+                            Background="#FFFFEEF4"
+                            CornerRadius="18">
+                        <StackPanel>
+                            <TextBlock FontSize="22" Text="💗" />
+                            <TextBlock Margin="0,8,0,0"
+                                       FontSize="15"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource InkBrush}"
+                                       Text="상담·감성·글쓰기" />
+                            <TextBlock Margin="0,6,0,0"
+                                       FontSize="11.5"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       LineHeight="20"
+                                       Text="상담, 감성 대화, 글쓰기와 문과생 작업에는 Claude Opus 4.6을 추천해요."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
+                <Border Margin="0,16,0,4"
+                        Padding="16,13"
+                        Background="#FFFFFFFF"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="15">
+                    <TextBlock HorizontalAlignment="Center"
+                               FontSize="11.5"
+                               Foreground="{StaticResource MutedBrush}"
+                               Text="어떤 모델을 고를지 헷갈리면 GPT Terra부터 시작해 보세요 🐇" />
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </Window>
