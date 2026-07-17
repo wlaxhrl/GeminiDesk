@@ -503,6 +503,42 @@ public partial class MainWindow : Window
         await RefreshExchangeRateAsync();
     }
 
+    private async void CompareSubscriptionsButton_Click(object sender, RoutedEventArgs e)
+    {
+        CompareSubscriptionsButton.IsEnabled = false;
+
+        try
+        {
+            var records = _chatStore.GetUsageRecords(_usageMonth);
+            var exchangeRate = await _exchangeRateService.GetUsdToKrwAsync();
+            UsageExchangeRateText.Text = FormatExchangeRateLabel(exchangeRate);
+            var comparisons = SubscriptionComparisonCalculator.Create(
+                records,
+                exchangeRate.UsdToKrw);
+            var dialog = new SubscriptionComparisonDialog(
+                _usageMonth,
+                comparisons,
+                exchangeRate)
+            {
+                Owner = this
+            };
+
+            dialog.ShowDialog();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                $"구독 비교 결과를 만들지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                "구독 비교 오류",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+        finally
+        {
+            CompareSubscriptionsButton.IsEnabled = true;
+        }
+    }
+
     private void BackToChatButton_Click(object sender, RoutedEventArgs e)
     {
         ShowChatView();
@@ -2369,6 +2405,7 @@ public partial class MainWindow : Window
         UpdateButton.IsEnabled = !isBusy && !isEditing && !_isCheckingForUpdates && !_isDownloadingUpdate;
         ApiKeySettingsButton.IsEnabled = !isBusy && !isEditing;
         UsageButton.IsEnabled = !isBusy && !isEditing;
+        CompareSubscriptionsButton.IsEnabled = !isBusy && !isEditing;
         GeminiApiKeyBox.IsEnabled = !isBusy;
         OpenAiApiKeyBox.IsEnabled = !isBusy;
         AnthropicApiKeyBox.IsEnabled = !isBusy;
