@@ -133,18 +133,18 @@ public sealed class ReadableMarkdownViewer : MarkdownScrollViewer
                     ReplaceMathExpressions(section.Blocks);
                     break;
                 case List list:
-                    foreach (var item in list.ListItems)
+                    foreach (var item in list.ListItems.Cast<ListItem>().ToList())
                     {
                         ReplaceMathExpressions(item.Blocks);
                     }
 
                     break;
                 case Table table:
-                    foreach (var rowGroup in table.RowGroups)
+                    foreach (var rowGroup in table.RowGroups.Cast<TableRowGroup>().ToList())
                     {
-                        foreach (var row in rowGroup.Rows)
+                        foreach (var row in rowGroup.Rows.Cast<TableRow>().ToList())
                         {
-                            foreach (var cell in row.Cells)
+                            foreach (var cell in row.Cells.Cast<TableCell>().ToList())
                             {
                                 ReplaceMathExpressions(cell.Blocks);
                             }
