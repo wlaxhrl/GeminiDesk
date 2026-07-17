@@ -612,12 +612,14 @@ public partial class MainWindow : Window
 
     private static string FormatKrw(double amount)
     {
-        return amount switch
+        if (!double.IsFinite(amount) || amount < 0)
         {
-            < 1 => $"₩{amount:0.00}",
-            < 1000 => $"₩{amount:0.##}",
-            _ => $"₩{amount:N0}"
-        };
+            amount = 0;
+        }
+
+        var culture = CultureInfo.GetCultureInfo("ko-KR");
+        var wholeWon = Math.Truncate(amount);
+        return $"{wholeWon.ToString("N0", culture)}원 (₩{amount.ToString("N2", culture)})";
     }
 
     private void RefreshApiKeySettingsFields()
