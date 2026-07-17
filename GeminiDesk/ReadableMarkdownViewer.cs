@@ -276,10 +276,10 @@ public sealed class ReadableMarkdownViewer : MarkdownScrollViewer
     {
         var control = new FormulaControl
         {
+            ClipToBounds = false,
             Focusable = false,
             Foreground = new SolidColorBrush(Color.FromRgb(43, 39, 57)),
             HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = isDisplay ? new Thickness(2) : new Thickness(2, 0, 2, 0),
             Scale = isDisplay ? 21 : 17,
             SystemTextFontName = "Malgun Gothic",
             VerticalAlignment = VerticalAlignment.Center
@@ -288,7 +288,18 @@ public sealed class ReadableMarkdownViewer : MarkdownScrollViewer
 
         if (!control.HasError)
         {
-            return control;
+            // FormulaControl measures only the size of the rendered glyph bounds, not
+            // their positive X/Y offset. Descenders such as ψ can otherwise extend a
+            // few pixels beyond the measured area and be clipped by the scroll host.
+            return new Border
+            {
+                Background = Brushes.Transparent,
+                Child = control,
+                ClipToBounds = false,
+                Padding = isDisplay
+                    ? new Thickness(5, 4, 5, 9)
+                    : new Thickness(3, 2, 3, 6)
+            };
         }
 
         var fallback = new TextBlock
