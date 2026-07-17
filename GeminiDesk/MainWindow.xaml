@@ -203,6 +203,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -243,7 +244,15 @@
                         Click="ApiKeySettingsButton_Click"
                         Content="🔑  API 키 설정" />
 
-                <DockPanel Grid.Row="3" Margin="4,22,4,8">
+                <Button x:Name="UsageButton"
+                        Grid.Row="3"
+                        Height="40"
+                        Margin="0,7,0,0"
+                        Style="{StaticResource PillButton}"
+                        Click="UsageButton_Click"
+                        Content="₩  사용료" />
+
+                <DockPanel Grid.Row="4" Margin="4,22,4,8">
                     <TextBlock FontSize="12"
                                FontWeight="SemiBold"
                                Foreground="{StaticResource MutedBrush}"
@@ -259,7 +268,7 @@
                 </DockPanel>
 
                 <ListBox x:Name="ConversationList"
-                         Grid.Row="4"
+                         Grid.Row="5"
                          ItemsSource="{Binding Conversations}"
                          Background="Transparent"
                          BorderThickness="0"
@@ -311,14 +320,14 @@
                 </ListBox>
 
                 <Button x:Name="DeleteChatButton"
-                        Grid.Row="5"
+                        Grid.Row="6"
                         Height="36"
                         Margin="0,12,0,0"
                         Style="{StaticResource DangerButton}"
                         Click="DeleteChatButton_Click"
                         Content="선택한 대화 삭제" />
 
-                <StackPanel Grid.Row="6" Margin="2,10,2,0">
+                <StackPanel Grid.Row="7" Margin="2,10,2,0">
                     <DockPanel LastChildFill="False">
                         <TextBlock x:Name="VersionText"
                                    VerticalAlignment="Center"
@@ -1097,5 +1106,237 @@
                 </Grid>
             </Grid>
         </ScrollViewer>
+
+        <Grid x:Name="UsageView"
+              Grid.Column="1"
+              Margin="28,22,28,18"
+              MaxWidth="900"
+              HorizontalAlignment="Stretch"
+              Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="2,0,2,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock FontSize="27"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource InkBrush}"
+                               Text="예상 사용료" />
+                    <TextBlock Margin="1,6,0,0"
+                               Foreground="{StaticResource MutedBrush}"
+                               Text="이번 달에 AI를 얼마나 사용했는지 가볍게 확인해요 💸" />
+                </StackPanel>
+                <Button Grid.Column="1"
+                        Height="38"
+                        Padding="14,6"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource PillButton}"
+                        Click="BackToChatButton_Click"
+                        Content="←  채팅으로 돌아가기" />
+            </Grid>
+
+            <Border Grid.Row="1"
+                    Margin="0,0,0,16"
+                    Padding="24,21"
+                    CornerRadius="22">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Offset="0" Color="#FF7567E8" />
+                        <GradientStop Offset="0.55" Color="#FF8B78EB" />
+                        <GradientStop Offset="1" Color="#FFCF7FA9" />
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="#DDFFFFFF"
+                                   Text="이달의 예상 합계" />
+                        <TextBlock x:Name="UsageTotalText"
+                                   Margin="0,5,0,0"
+                                   FontSize="34"
+                                   FontWeight="Bold"
+                                   Foreground="White"
+                                   Text="₩0.00" />
+                        <TextBlock Margin="1,7,0,0"
+                                   FontSize="10.5"
+                                   Foreground="#CCFFFFFF"
+                                   Text="편의 환산 기준 · $1 = ₩1,400" />
+                    </StackPanel>
+                    <Border Grid.Column="1"
+                            MinWidth="94"
+                            Margin="20,0,0,0"
+                            Padding="15,10"
+                            VerticalAlignment="Center"
+                            Background="#2AFFFFFF"
+                            CornerRadius="15">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock HorizontalAlignment="Center"
+                                       FontSize="19"
+                                       Text="🐰" />
+                            <TextBlock x:Name="UsageRequestCountText"
+                                       Margin="0,4,0,0"
+                                       HorizontalAlignment="Center"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="White"
+                                       Text="0번 사용" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="2" Margin="2,0,2,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button x:Name="PreviousUsageMonthButton"
+                        Width="42"
+                        Height="36"
+                        Padding="0"
+                        Style="{StaticResource PillButton}"
+                        Click="PreviousUsageMonthButton_Click"
+                        Content="‹" />
+                <TextBlock x:Name="UsageMonthText"
+                           Grid.Column="1"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontSize="16"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource InkBrush}"
+                           Text="2026년 7월" />
+                <Button x:Name="NextUsageMonthButton"
+                        Grid.Column="2"
+                        Width="42"
+                        Height="36"
+                        Padding="0"
+                        Style="{StaticResource PillButton}"
+                        Click="NextUsageMonthButton_Click"
+                        Content="›" />
+            </Grid>
+
+            <Border Grid.Row="3"
+                    Background="{StaticResource CardBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="20">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Margin="20,14,20,11">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="150" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Text="날짜" />
+                        <TextBlock Grid.Column="1"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Text="모델명" />
+                        <TextBlock Grid.Column="2"
+                                   HorizontalAlignment="Right"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Text="금액" />
+                    </Grid>
+
+                    <ScrollViewer Grid.Row="1"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding UsageItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="12,0,12,8"
+                                            Padding="10,13"
+                                            Background="#FFFCFBFE"
+                                            CornerRadius="13">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="158" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="138" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock VerticalAlignment="Center"
+                                                       FontSize="12"
+                                                       Foreground="{StaticResource MutedBrush}"
+                                                       Text="{Binding DateLabel}" />
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock FontSize="13"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource InkBrush}"
+                                                           Text="{Binding ModelName}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Margin="0,3,0,0"
+                                                           FontSize="9.5"
+                                                           Foreground="{StaticResource MutedBrush}"
+                                                           Text="{Binding ProviderLabel}" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2"
+                                                       HorizontalAlignment="Right"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="13"
+                                                       FontWeight="Bold"
+                                                       Foreground="{StaticResource PrimaryBrush}"
+                                                       Text="{Binding AmountLabel}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <StackPanel x:Name="UsageEmptyState"
+                                Grid.Row="1"
+                                Margin="20"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                        <TextBlock HorizontalAlignment="Center"
+                                   FontSize="30"
+                                   Text="🌱" />
+                        <TextBlock Margin="0,9,0,0"
+                                   HorizontalAlignment="Center"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource InkBrush}"
+                                   Text="아직 기록된 사용료가 없어요" />
+                        <TextBlock Margin="0,5,0,0"
+                                   HorizontalAlignment="Center"
+                                   FontSize="11"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Text="이 기능을 켠 뒤 완료된 새 요청부터 차곡차곡 보여요" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <TextBlock Grid.Row="4"
+                       Margin="3,10,3,0"
+                       HorizontalAlignment="Right"
+                       FontSize="10"
+                       Foreground="#FFA39EAD"
+                       Text="공식 단가 기준 예상치예요 · 무료 한도, 세금, 환율 변동은 실제 청구와 다를 수 있어요" />
+        </Grid>
     </Grid>
 </Window>

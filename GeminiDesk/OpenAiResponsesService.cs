@@ -12,7 +12,8 @@ namespace GeminiDesk;
 
 internal sealed record OpenAiStreamChunk(
     string TextDelta,
-    IReadOnlyList<ChatSource> Sources);
+    IReadOnlyList<ChatSource> Sources,
+    AiRequestUsage? Usage);
 
 internal sealed class OpenAiResponsesService
 {
@@ -74,7 +75,7 @@ internal sealed class OpenAiResponsesService
                 if (delta.Length > 0)
                 {
                     streamedText.Append(delta);
-                    yield return new OpenAiStreamChunk(delta, []);
+                    yield return new OpenAiStreamChunk(delta, [], null);
                 }
 
                 continue;
@@ -86,6 +87,9 @@ internal sealed class OpenAiResponsesService
             }
 
             var sources = ExtractUrlCitations(root);
+            var usage = type == "response.completed"
+                ? ExtractCompletedUsage(root)
+                : null;
             var fallbackText = type == "response.completed" && streamedText.Length == 0
                 ? ExtractCompletedText(root)
                 : string.Empty;
@@ -95,11 +99,40 @@ internal sealed class OpenAiResponsesService
                 streamedText.Append(fallbackText);
             }
 
-            if (fallbackText.Length > 0 || sources.Count > 0)
+            if (fallbackText.Length > 0 || sources.Count > 0 || usage is not null)
             {
-                yield return new OpenAiStreamChunk(fallbackText, sources);
+                yield return new OpenAiStreamChunk(fallbackText, sources, usage);
             }
         }
+    }
+
+    private static AiRequestUsage? ExtractCompletedUsage(JsonElement root)
+    {
+        if (!root.TryGetProperty("response", out var response) ||
+            !response.TryGetProperty("usage", out var usage) ||
+            usage.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var inputTokens = TryGetInt64(usage, "input_tokens");
+        var outputTokens = TryGetInt64(usage, "output_tokens");
+        var cachedTokens = usage.TryGetProperty("input_tokens_details", out var inputDetails)
+            ? TryGetInt64(inputDetails, "cached_tokens")
+            : 0;
+        var searchCalls = 0;
+
+        if (response.TryGetProperty("output", out var output) && output.ValueKind == JsonValueKind.Array)
+        {
+            searchCalls = output.EnumerateArray().Count(item =>
+                TryGetString(item, "type") is "web_search_call" or "web_search_preview_call");
+        }
+
+        return new AiRequestUsage(
+            InputTokens: inputTokens,
+            CachedInputTokens: cachedTokens,
+            OutputTokens: outputTokens,
+            SearchQueries: searchCalls);
     }
 
     private static string BuildRequestJson(
@@ -356,6 +389,16 @@ internal sealed class OpenAiResponsesService
                property.ValueKind == JsonValueKind.String
             ? property.GetString()
             : null;
+    }
+
+    private static long TryGetInt64(JsonElement element, string propertyName)
+    {
+        return element.ValueKind == JsonValueKind.Object &&
+               element.TryGetProperty(propertyName, out var property) &&
+               property.ValueKind == JsonValueKind.Number &&
+               property.TryGetInt64(out var value)
+            ? value
+            : 0;
     }
 
     private static HttpClient CreateHttpClient()

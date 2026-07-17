@@ -51,12 +51,14 @@ public partial class MainWindow : Window
     private ChatMessage? _editingUserMessage;
     private string? _currentConversationId;
     private string _selectedModelId = DefaultModelId;
+    private DateTime _usageMonth = new(DateTime.Now.Year, DateTime.Now.Month, 1);
     private bool _isUpdatingConversationSelection;
     private bool _isCheckingForUpdates;
     private bool _isDownloadingUpdate;
 
     public ObservableCollection<ChatMessage> Messages { get; } = [];
     public ObservableCollection<ConversationSummary> Conversations { get; } = [];
+    public ObservableCollection<UsageDisplayItem> UsageItems { get; } = [];
 
     public MainWindow()
     {
@@ -492,6 +494,11 @@ public partial class MainWindow : Window
         ShowApiKeySettings();
     }
 
+    private void UsageButton_Click(object sender, RoutedEventArgs e)
+    {
+        ShowUsageView();
+    }
+
     private void BackToChatButton_Click(object sender, RoutedEventArgs e)
     {
         ShowChatView();
@@ -501,6 +508,7 @@ public partial class MainWindow : Window
     {
         RefreshApiKeySettingsFields();
         ChatView.Visibility = Visibility.Collapsed;
+        UsageView.Visibility = Visibility.Collapsed;
         ApiKeySettingsView.Visibility = Visibility.Visible;
         ApiKeySettingsNotice.Text = notice ?? "키를 지운 채 저장하면 해당 키도 Windows에서 삭제돼요.";
         ApiKeySettingsView.ScrollToTop();
@@ -514,8 +522,75 @@ public partial class MainWindow : Window
     private void ShowChatView()
     {
         ApiKeySettingsView.Visibility = Visibility.Collapsed;
+        UsageView.Visibility = Visibility.Collapsed;
         ChatView.Visibility = Visibility.Visible;
         PromptBox.Focus();
+    }
+
+    private void ShowUsageView()
+    {
+        ChatView.Visibility = Visibility.Collapsed;
+        ApiKeySettingsView.Visibility = Visibility.Collapsed;
+        UsageView.Visibility = Visibility.Visible;
+        RefreshUsageView();
+    }
+
+    private void PreviousUsageMonthButton_Click(object sender, RoutedEventArgs e)
+    {
+        _usageMonth = _usageMonth.AddMonths(-1);
+        RefreshUsageView();
+    }
+
+    private void NextUsageMonthButton_Click(object sender, RoutedEventArgs e)
+    {
+        var currentMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+        if (_usageMonth >= currentMonth)
+        {
+            return;
+        }
+
+        _usageMonth = _usageMonth.AddMonths(1);
+        RefreshUsageView();
+    }
+
+    private void RefreshUsageView()
+    {
+        try
+        {
+            var records = _chatStore.GetUsageRecords(_usageMonth);
+            UsageItems.Clear();
+
+            foreach (var record in records)
+            {
+                UsageItems.Add(UsageDisplayItem.FromRecord(record));
+            }
+
+            UsageMonthText.Text = _usageMonth.ToString("yyyy년 M월", CultureInfo.GetCultureInfo("ko-KR"));
+            UsageTotalText.Text = FormatKrw(records.Sum(record => record.EstimatedCostKrw));
+            UsageRequestCountText.Text = $"{records.Count:N0}번 사용";
+            UsageEmptyState.Visibility = records.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            var currentMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+            NextUsageMonthButton.IsEnabled = _usageMonth < currentMonth;
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                $"사용료 내역을 불러오지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                "사용료 불러오기 오류",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private static string FormatKrw(double amount)
+    {
+        return amount switch
+        {
+            < 1 => $"₩{amount:0.00}",
+            < 1000 => $"₩{amount:0.##}",
+            _ => $"₩{amount:N0}"
+        };
     }
 
     private void RefreshApiKeySettingsFields()
@@ -909,12 +984,13 @@ public partial class MainWindow : Window
                 Parts = userParts
             };
             var requestContents = _conversationHistory.Append(userContent).ToList();
-            await GenerateModelResponseAsync(
+            var usage = await GenerateModelResponseAsync(
                 modelMessage,
                 apiKey,
                 requestModel,
                 requestContents,
                 _generationCancellation.Token);
+            SaveUsageEstimate(requestModel, usage);
 
             CompleteExchange(userContent, userMessage, modelMessage, prompt, attachments, "응답 완료 · 저장됨");
         }
@@ -954,7 +1030,7 @@ public partial class MainWindow : Window
             ?? _modelOptions.First(model => model.Id == DefaultModelId);
     }
 
-    private async Task GenerateModelResponseAsync(
+    private async Task<AiRequestUsage> GenerateModelResponseAsync(
         ChatMessage modelMessage,
         string apiKey,
         AiModelOption model,
@@ -962,6 +1038,8 @@ public partial class MainWindow : Window
         CancellationToken cancellationToken)
     {
         var collectedSources = new List<ChatSource>();
+        var googleSearchQueries = new HashSet<string>(StringComparer.Ordinal);
+        var requestUsage = new AiRequestUsage();
 
         if (model.IsImageGeneration)
         {
@@ -978,6 +1056,7 @@ public partial class MainWindow : Window
                 result.Images,
                 model,
                 cancellationToken);
+            requestUsage = result.Usage;
             ScrollToLatestMessage();
         }
         else if (model.Provider == ModelProvider.OpenAi)
@@ -996,18 +1075,30 @@ public partial class MainWindow : Window
                 }
 
                 collectedSources.AddRange(chunk.Sources);
+                if (chunk.Usage is not null)
+                {
+                    requestUsage = chunk.Usage;
+                }
             }
         }
         else if (model.Provider == ModelProvider.Anthropic)
         {
-            await foreach (var textDelta in _anthropicMessagesService.StreamResponseAsync(
+            await foreach (var chunk in _anthropicMessagesService.StreamResponseAsync(
                                apiKey,
                                model,
                                requestContents,
                                cancellationToken))
             {
-                modelMessage.Text += textDelta;
-                ScrollToLatestMessage();
+                if (!string.IsNullOrEmpty(chunk.TextDelta))
+                {
+                    modelMessage.Text += chunk.TextDelta;
+                    ScrollToLatestMessage();
+                }
+
+                if (chunk.Usage is not null)
+                {
+                    requestUsage = chunk.Usage;
+                }
             }
         }
         else
@@ -1038,6 +1129,19 @@ public partial class MainWindow : Window
                 }
 
                 collectedSources.AddRange(ExtractSources(chunk));
+                googleSearchQueries.UnionWith(UsageMetadataMapper.GetGoogleSearchQueries(chunk));
+                var chunkUsage = UsageMetadataMapper.FromGoogle(chunk);
+                if (chunk.UsageMetadata is not null)
+                {
+                    requestUsage = chunkUsage with
+                    {
+                        SearchQueries = googleSearchQueries.Count
+                    };
+                }
+                else if (googleSearchQueries.Count > requestUsage.SearchQueries)
+                {
+                    requestUsage = requestUsage with { SearchQueries = googleSearchQueries.Count };
+                }
             }
         }
 
@@ -1052,6 +1156,23 @@ public partial class MainWindow : Window
         modelMessage.ModelId = model.Id;
         modelMessage.RefreshModelDisplayName(model.DisplayName);
         modelMessage.IsStreaming = false;
+        return requestUsage;
+    }
+
+    private void SaveUsageEstimate(AiModelOption model, AiRequestUsage usage)
+    {
+        try
+        {
+            _chatStore.SaveUsage(UsagePriceCalculator.CreateRecord(model, usage));
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                $"답변은 받았지만 사용료 내역을 저장하지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                "사용료 저장 오류",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private static string FormatRequestError(Exception exception, string provider)
@@ -1897,12 +2018,13 @@ public partial class MainWindow : Window
 
         try
         {
-            await GenerateModelResponseAsync(
+            var usage = await GenerateModelResponseAsync(
                 modelMessage,
                 apiKey,
                 requestModel,
                 _conversationHistory.ToList(),
                 _generationCancellation.Token);
+            SaveUsageEstimate(requestModel, usage);
 
             var regeneratedModelContent = CreateModelHistoryContent(modelMessage);
             _chatStore.ReplaceLatestExchange(_currentConversationId, userMessage, modelMessage);
@@ -2083,12 +2205,13 @@ public partial class MainWindow : Window
 
         try
         {
-            await GenerateModelResponseAsync(
+            var usage = await GenerateModelResponseAsync(
                 modelMessage,
                 apiKey,
                 requestModel,
                 _conversationHistory.ToList(),
                 _generationCancellation.Token);
+            SaveUsageEstimate(requestModel, usage);
 
             var regeneratedModelContent = CreateModelHistoryContent(modelMessage);
             _chatStore.ReplaceLatestModelMessage(_currentConversationId, modelMessage);
@@ -2212,6 +2335,7 @@ public partial class MainWindow : Window
         ModelSelector.IsEnabled = !isBusy;
         UpdateButton.IsEnabled = !isBusy && !isEditing && !_isCheckingForUpdates && !_isDownloadingUpdate;
         ApiKeySettingsButton.IsEnabled = !isBusy && !isEditing;
+        UsageButton.IsEnabled = !isBusy && !isEditing;
         GeminiApiKeyBox.IsEnabled = !isBusy;
         OpenAiApiKeyBox.IsEnabled = !isBusy;
         AnthropicApiKeyBox.IsEnabled = !isBusy;
@@ -2236,6 +2360,37 @@ public partial class MainWindow : Window
         _generationCancellation?.Cancel();
         _generationCancellation?.Dispose();
         base.OnClosed(e);
+    }
+}
+
+public sealed record UsageDisplayItem(
+    string DateLabel,
+    string ModelName,
+    string ProviderLabel,
+    string AmountLabel)
+{
+    internal static UsageDisplayItem FromRecord(UsageRecord record)
+    {
+        var providerLabel = record.Provider switch
+        {
+            ModelProvider.Google => "Google Gemini",
+            ModelProvider.OpenAi => "OpenAI",
+            ModelProvider.Anthropic => "Anthropic Claude",
+            _ => record.Provider
+        };
+        var localTime = record.OccurredAtUtc.ToLocalTime();
+        var amountLabel = record.EstimatedCostKrw switch
+        {
+            < 1 => $"₩{record.EstimatedCostKrw:0.00}",
+            < 1000 => $"₩{record.EstimatedCostKrw:0.##}",
+            _ => $"₩{record.EstimatedCostKrw:N0}"
+        };
+
+        return new UsageDisplayItem(
+            localTime.ToString("M월 d일 (ddd) HH:mm", CultureInfo.GetCultureInfo("ko-KR")),
+            record.ModelDisplayName,
+            providerLabel,
+            amountLabel);
     }
 }
 

@@ -13,7 +13,8 @@ internal sealed record GeneratedImageData(byte[] Data, string MimeType);
 
 internal sealed record ImageGenerationResult(
     string Text,
-    IReadOnlyList<GeneratedImageData> Images);
+    IReadOnlyList<GeneratedImageData> Images,
+    AiRequestUsage Usage);
 
 internal sealed class ImageGenerationService
 {
@@ -99,7 +100,10 @@ internal sealed class ImageGenerationService
         var text = string.Concat(parts
             .Select(part => part.Text)
             .Where(value => !string.IsNullOrWhiteSpace(value)));
-        return new ImageGenerationResult(text, images);
+        return new ImageGenerationResult(
+            text,
+            images,
+            UsageMetadataMapper.FromGoogle(response, images.Count));
     }
 
     private static async Task<ImageGenerationResult> GenerateWithOpenAiAsync(
@@ -153,7 +157,50 @@ internal sealed class ImageGenerationService
             throw new InvalidOperationException("OpenAI가 이미지를 반환하지 않았습니다. 프롬프트를 조금 더 구체적으로 적어 주세요.");
         }
 
-        return new ImageGenerationResult(string.Empty, images);
+        return new ImageGenerationResult(
+            string.Empty,
+            images,
+            ExtractOpenAiImageUsage(document.RootElement, images.Count));
+    }
+
+    private static AiRequestUsage ExtractOpenAiImageUsage(JsonElement root, int generatedImages)
+    {
+        if (!root.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object)
+        {
+            return new AiRequestUsage(GeneratedImages: generatedImages);
+        }
+
+        var inputTokens = TryGetInt64(usage, "input_tokens");
+        var outputTokens = TryGetInt64(usage, "output_tokens");
+        long imageInputTokens = 0;
+        long cachedInputTokens = 0;
+        long cachedImageInputTokens = 0;
+
+        if (usage.TryGetProperty("input_tokens_details", out var inputDetails))
+        {
+            imageInputTokens = TryGetInt64(inputDetails, "image_tokens");
+            cachedInputTokens = TryGetInt64(inputDetails, "cached_tokens");
+            cachedImageInputTokens = TryGetInt64(inputDetails, "cached_image_tokens");
+        }
+
+        return new AiRequestUsage(
+            InputTokens: inputTokens,
+            CachedInputTokens: cachedInputTokens,
+            OutputTokens: outputTokens,
+            ImageInputTokens: imageInputTokens,
+            CachedImageInputTokens: cachedImageInputTokens,
+            ImageOutputTokens: outputTokens,
+            GeneratedImages: generatedImages);
+    }
+
+    private static long TryGetInt64(JsonElement element, string propertyName)
+    {
+        return element.ValueKind == JsonValueKind.Object &&
+               element.TryGetProperty(propertyName, out var property) &&
+               property.ValueKind == JsonValueKind.Number &&
+               property.TryGetInt64(out var value)
+            ? value
+            : 0;
     }
 
     private static HttpRequestMessage CreateOpenAiGenerationRequest(

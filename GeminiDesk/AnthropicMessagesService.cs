@@ -10,6 +10,10 @@ using Google.GenAI.Types;
 
 namespace GeminiDesk;
 
+internal sealed record AnthropicStreamChunk(
+    string TextDelta,
+    AiRequestUsage? Usage);
+
 internal sealed class AnthropicMessagesService
 {
     private const string MessagesUrl = "https://api.anthropic.com/v1/messages";
@@ -17,7 +21,7 @@ internal sealed class AnthropicMessagesService
     private const int MaxOutputTokens = 32768;
     private static readonly HttpClient HttpClient = CreateHttpClient();
 
-    public async IAsyncEnumerable<string> StreamResponseAsync(
+    public async IAsyncEnumerable<AnthropicStreamChunk> StreamResponseAsync(
         string apiKey,
         AiModelOption model,
         IReadOnlyList<Content> conversation,
@@ -47,6 +51,11 @@ internal sealed class AnthropicMessagesService
 
         await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(responseStream);
+        long baseInputTokens = 0;
+        long cacheReadTokens = 0;
+        long cacheWriteTokens = 0;
+        long outputTokens = 0;
+        var usageYielded = false;
 
         while (await reader.ReadLineAsync(cancellationToken) is { } line)
         {
@@ -65,12 +74,41 @@ internal sealed class AnthropicMessagesService
             var root = document.RootElement;
             var eventType = TryGetString(root, "type");
 
+            if (eventType == "message_start" &&
+                root.TryGetProperty("message", out var message) &&
+                message.TryGetProperty("usage", out var startUsage))
+            {
+                baseInputTokens = TryGetInt64(startUsage, "input_tokens");
+                cacheReadTokens = TryGetInt64(startUsage, "cache_read_input_tokens");
+                cacheWriteTokens = TryGetInt64(startUsage, "cache_creation_input_tokens");
+                continue;
+            }
+
             if (eventType == "content_block_delta" &&
                 root.TryGetProperty("delta", out var delta) &&
                 TryGetString(delta, "type") == "text_delta" &&
                 TryGetString(delta, "text") is { Length: > 0 } textDelta)
             {
-                yield return textDelta;
+                yield return new AnthropicStreamChunk(textDelta, null);
+                continue;
+            }
+
+            if (eventType == "message_delta" && root.TryGetProperty("usage", out var deltaUsage))
+            {
+                outputTokens = TryGetInt64(deltaUsage, "output_tokens");
+                usageYielded = true;
+                yield return new AnthropicStreamChunk(
+                    string.Empty,
+                    CreateUsage(baseInputTokens, cacheReadTokens, cacheWriteTokens, outputTokens));
+                continue;
+            }
+
+            if (eventType == "message_stop" && !usageYielded)
+            {
+                usageYielded = true;
+                yield return new AnthropicStreamChunk(
+                    string.Empty,
+                    CreateUsage(baseInputTokens, cacheReadTokens, cacheWriteTokens, outputTokens));
                 continue;
             }
 
@@ -79,6 +117,19 @@ internal sealed class AnthropicMessagesService
                 throw new InvalidOperationException(ExtractStreamError(root));
             }
         }
+    }
+
+    private static AiRequestUsage CreateUsage(
+        long baseInputTokens,
+        long cacheReadTokens,
+        long cacheWriteTokens,
+        long outputTokens)
+    {
+        return new AiRequestUsage(
+            InputTokens: baseInputTokens + cacheReadTokens + cacheWriteTokens,
+            CachedInputTokens: cacheReadTokens,
+            CacheWriteInputTokens: cacheWriteTokens,
+            OutputTokens: outputTokens);
     }
 
     private static string BuildRequestJson(
@@ -271,6 +322,16 @@ internal sealed class AnthropicMessagesService
                property.ValueKind == JsonValueKind.String
             ? property.GetString()
             : null;
+    }
+
+    private static long TryGetInt64(JsonElement element, string propertyName)
+    {
+        return element.ValueKind == JsonValueKind.Object &&
+               element.TryGetProperty(propertyName, out var property) &&
+               property.ValueKind == JsonValueKind.Number &&
+               property.TryGetInt64(out var value)
+            ? value
+            : 0;
     }
 
     private static HttpClient CreateHttpClient()

@@ -52,6 +52,101 @@ public sealed class ChatStore
         command.ExecuteNonQuery();
     }
 
+    internal void SaveUsage(UsageRecord record)
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO UsageRecords (
+                OccurredAtUtc, Provider, ModelId, ModelDisplayName,
+                InputTokens, CachedInputTokens, CacheWriteInputTokens, OutputTokens,
+                ImageInputTokens, CachedImageInputTokens, ImageOutputTokens,
+                SearchQueries, GeneratedImages, EstimatedCostUsd, UsdToKrw,
+                EstimatedCostKrw, PricingVersion)
+            VALUES (
+                $occurredAt, $provider, $modelId, $modelDisplayName,
+                $inputTokens, $cachedInputTokens, $cacheWriteInputTokens, $outputTokens,
+                $imageInputTokens, $cachedImageInputTokens, $imageOutputTokens,
+                $searchQueries, $generatedImages, $estimatedCostUsd, $usdToKrw,
+                $estimatedCostKrw, $pricingVersion);
+            """;
+        command.Parameters.AddWithValue("$occurredAt", record.OccurredAtUtc.ToString("O"));
+        command.Parameters.AddWithValue("$provider", record.Provider);
+        command.Parameters.AddWithValue("$modelId", record.ModelId);
+        command.Parameters.AddWithValue("$modelDisplayName", record.ModelDisplayName);
+        command.Parameters.AddWithValue("$inputTokens", record.Usage.InputTokens);
+        command.Parameters.AddWithValue("$cachedInputTokens", record.Usage.CachedInputTokens);
+        command.Parameters.AddWithValue("$cacheWriteInputTokens", record.Usage.CacheWriteInputTokens);
+        command.Parameters.AddWithValue("$outputTokens", record.Usage.OutputTokens);
+        command.Parameters.AddWithValue("$imageInputTokens", record.Usage.ImageInputTokens);
+        command.Parameters.AddWithValue("$cachedImageInputTokens", record.Usage.CachedImageInputTokens);
+        command.Parameters.AddWithValue("$imageOutputTokens", record.Usage.ImageOutputTokens);
+        command.Parameters.AddWithValue("$searchQueries", record.Usage.SearchQueries);
+        command.Parameters.AddWithValue("$generatedImages", record.Usage.GeneratedImages);
+        command.Parameters.AddWithValue("$estimatedCostUsd", record.EstimatedCostUsd);
+        command.Parameters.AddWithValue("$usdToKrw", record.UsdToKrw);
+        command.Parameters.AddWithValue("$estimatedCostKrw", record.EstimatedCostKrw);
+        command.Parameters.AddWithValue("$pricingVersion", record.PricingVersion);
+        command.ExecuteNonQuery();
+    }
+
+    internal IReadOnlyList<UsageRecord> GetUsageRecords(DateTime localMonth)
+    {
+        var startLocal = new DateTime(
+            localMonth.Year,
+            localMonth.Month,
+            1,
+            0,
+            0,
+            0,
+            DateTimeKind.Local);
+        var endLocal = startLocal.AddMonths(1);
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT Id, OccurredAtUtc, Provider, ModelId, ModelDisplayName,
+                   InputTokens, CachedInputTokens, CacheWriteInputTokens, OutputTokens,
+                   ImageInputTokens, CachedImageInputTokens, ImageOutputTokens,
+                   SearchQueries, GeneratedImages, EstimatedCostUsd, UsdToKrw,
+                   EstimatedCostKrw, PricingVersion
+            FROM UsageRecords
+            WHERE OccurredAtUtc >= $startUtc AND OccurredAtUtc < $endUtc
+            ORDER BY OccurredAtUtc DESC, Id DESC;
+            """;
+        command.Parameters.AddWithValue("$startUtc", startLocal.ToUniversalTime().ToString("O"));
+        command.Parameters.AddWithValue("$endUtc", endLocal.ToUniversalTime().ToString("O"));
+
+        using var reader = command.ExecuteReader();
+        var records = new List<UsageRecord>();
+
+        while (reader.Read())
+        {
+            records.Add(new UsageRecord(
+                reader.GetInt64(0),
+                DateTime.Parse(reader.GetString(1), null, DateTimeStyles.RoundtripKind),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                new AiRequestUsage(
+                    reader.GetInt64(5),
+                    reader.GetInt64(6),
+                    reader.GetInt64(7),
+                    reader.GetInt64(8),
+                    reader.GetInt64(9),
+                    reader.GetInt64(10),
+                    reader.GetInt64(11),
+                    reader.GetInt32(12),
+                    reader.GetInt32(13)),
+                reader.GetDouble(14),
+                reader.GetDouble(15),
+                reader.GetDouble(16),
+                reader.GetString(17)));
+        }
+
+        return records;
+    }
+
     public IReadOnlyList<ConversationSummary> GetConversations()
     {
         using var connection = OpenConnection();
@@ -478,9 +573,31 @@ public sealed class ChatStore
                 Value TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS UsageRecords (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                OccurredAtUtc TEXT NOT NULL,
+                Provider TEXT NOT NULL,
+                ModelId TEXT NOT NULL,
+                ModelDisplayName TEXT NOT NULL,
+                InputTokens INTEGER NOT NULL,
+                CachedInputTokens INTEGER NOT NULL,
+                CacheWriteInputTokens INTEGER NOT NULL,
+                OutputTokens INTEGER NOT NULL,
+                ImageInputTokens INTEGER NOT NULL,
+                CachedImageInputTokens INTEGER NOT NULL,
+                ImageOutputTokens INTEGER NOT NULL,
+                SearchQueries INTEGER NOT NULL,
+                GeneratedImages INTEGER NOT NULL,
+                EstimatedCostUsd REAL NOT NULL,
+                UsdToKrw REAL NOT NULL,
+                EstimatedCostKrw REAL NOT NULL,
+                PricingVersion TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS IX_Messages_ConversationId ON Messages(ConversationId);
             CREATE INDEX IF NOT EXISTS IX_Attachments_MessageId ON Attachments(MessageId);
             CREATE INDEX IF NOT EXISTS IX_Sources_MessageId ON Sources(MessageId);
+            CREATE INDEX IF NOT EXISTS IX_UsageRecords_OccurredAtUtc ON UsageRecords(OccurredAtUtc);
             """;
         command.ExecuteNonQuery();
         EnsureMessageModelIdColumn(connection);
