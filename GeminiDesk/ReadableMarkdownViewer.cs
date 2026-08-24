@@ -104,6 +104,7 @@ public sealed class ReadableMarkdownViewer : MarkdownScrollViewer
             return;
         }
 
+        ReplaceCodeBlocks(Document.Blocks);
         ReplaceMathExpressions(Document.Blocks);
 
         Document.PagePadding = new Thickness(0);
@@ -114,6 +115,83 @@ public sealed class ReadableMarkdownViewer : MarkdownScrollViewer
         Document.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
 
         FormatBlocks(Document.Blocks);
+    }
+
+    private static void ReplaceCodeBlocks(BlockCollection blocks)
+    {
+        foreach (var block in blocks.Cast<Block>().ToList())
+        {
+            switch (block)
+            {
+                case Block codeBlock when TryReadCodeBlock(codeBlock, out var code, out var language):
+                    var replacement = new BlockUIContainer(BunnyCodeBlockView.Create(code, language))
+                    {
+                        Tag = "CodeBlock"
+                    };
+                    blocks.InsertBefore(codeBlock, replacement);
+                    blocks.Remove(codeBlock);
+                    break;
+                case Section section:
+                    ReplaceCodeBlocks(section.Blocks);
+                    break;
+                case List list:
+                    foreach (var item in list.ListItems.Cast<ListItem>().ToList())
+                    {
+                        ReplaceCodeBlocks(item.Blocks);
+                    }
+
+                    break;
+                case Table table:
+                    foreach (var rowGroup in table.RowGroups.Cast<TableRowGroup>().ToList())
+                    {
+                        foreach (var row in rowGroup.Rows.Cast<TableRow>().ToList())
+                        {
+                            foreach (var cell in row.Cells.Cast<TableCell>().ToList())
+                            {
+                                ReplaceCodeBlocks(cell.Blocks);
+                            }
+                        }
+                    }
+
+                    break;
+            }
+        }
+    }
+
+    private static bool TryReadCodeBlock(Block block, out string code, out string? language)
+    {
+        code = string.Empty;
+        language = null;
+
+        if (!Equals(block.Tag, "CodeBlock"))
+        {
+            return false;
+        }
+
+        if (block is Paragraph paragraph)
+        {
+            code = new TextRange(paragraph.ContentStart, paragraph.ContentEnd).Text;
+            return true;
+        }
+
+        if (block is not BlockUIContainer { Child: { } child })
+        {
+            return false;
+        }
+
+        // MdXaml 1.27 renders fenced code with AvalonEdit. Keeping that editor nested
+        // inside the chat causes its caret selection to scroll the outer conversation.
+        // Read the editor's public Text property without taking an extra dependency on
+        // AvalonEdit, then replace it with Bunny Desk's lightweight read-only view.
+        var textProperty = child.GetType().GetProperty("Text");
+        if (textProperty?.PropertyType != typeof(string) || textProperty.GetValue(child) is not string text)
+        {
+            return false;
+        }
+
+        code = text;
+        language = (child as FrameworkElement)?.Tag as string;
+        return true;
     }
 
     private void ReplaceMathExpressions(BlockCollection blocks)
@@ -329,6 +407,12 @@ public sealed class ReadableMarkdownViewer : MarkdownScrollViewer
 
             switch (block)
             {
+                case BlockUIContainer codeBlock when Equals(codeBlock.Tag, "CodeBlock"):
+                    codeBlock.Background = Brushes.Transparent;
+                    codeBlock.BorderThickness = new Thickness(0);
+                    codeBlock.Margin = new Thickness(0, 5, 0, 16);
+                    codeBlock.Padding = new Thickness(0);
+                    break;
                 case Paragraph paragraph:
                     paragraph.Margin = new Thickness(0, 3, 0, 15);
                     break;
