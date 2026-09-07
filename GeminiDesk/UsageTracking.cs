@@ -79,7 +79,7 @@ internal static class UsageMetadataMapper
 internal static class UsagePriceCalculator
 {
     public const double FallbackUsdToKrw = 1400d;
-    public const string PricingVersion = "2026-07-17";
+    public const string PricingVersion = "2026-09-07";
 
     public static UsageRecord CreateRecord(
         AiModelOption model,
@@ -165,16 +165,16 @@ internal static class UsagePriceCalculator
         }
 
         var isFlex = string.Equals(model.ServiceTier, "flex", StringComparison.Ordinal);
-        var (inputRate, cachedRate, outputRate) = model.Id switch
+        var (inputRate, cachedRate, outputRate) = model.RequestModelId switch
         {
-            "gpt-5.6-luna" => (1.00, 0.10, 6.00),
-            "gpt-5.6-terra" => (2.50, 0.25, 15.00),
-            "gpt-5.6-sol-standard" => (5.00, 0.50, 30.00),
-            "gpt-5.6-sol-flex" => (2.50, 0.25, 15.00),
+            "gpt-5.6-luna" => (0.20, 0.02, 1.20),
+            "gpt-5.6-terra" => (2.00, 0.20, 12.00),
+            "gpt-5.6-sol" => (4.00, 0.40, 20.00),
+            "gpt-6-astra" => (10.00, 1.00, 50.00),
             _ => (0d, 0d, 0d)
         };
 
-        if (isFlex && model.Id is not "gpt-5.6-sol-flex")
+        if (isFlex)
         {
             inputRate *= 0.5;
             cachedRate *= 0.5;

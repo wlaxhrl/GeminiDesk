@@ -39,7 +39,7 @@ public sealed record AiModelOption
 
 public static class ModelCatalogService
 {
-    private const int CurrentSchemaVersion = 6;
+    private const int CurrentSchemaVersion = 7;
     private const string RemoteCatalogUrl =
         "https://raw.githubusercontent.com/wlaxhrl/GeminiDesk/main/models.json";
 
@@ -210,7 +210,7 @@ public static class ModelCatalogService
                 ShortName = "Sol Standard",
                 Icon = "☀",
                 Badge = "STANDARD",
-                Description = "제일 똑똑해요 · 비싸고 빨라요!",
+                Description = "강력한 고급형 · 비싸고 빨라요!",
                 RequiresBilling = true,
                 ReasoningEffort = "max"
             },
@@ -223,7 +223,34 @@ public static class ModelCatalogService
                 ShortName = "Sol Flex",
                 Icon = "☀",
                 Badge = "FLEX",
-                Description = "제일 똑똑해요 · 느리고 반값!",
+                Description = "강력한 고급형 · 느리고 반값!",
+                RequiresBilling = true,
+                ReasoningEffort = "max",
+                ServiceTier = "flex"
+            },
+            new()
+            {
+                Id = "gpt-6-astra-standard",
+                ApiModelId = "gpt-6-astra",
+                Provider = ModelProvider.OpenAi,
+                DisplayName = "GPT-6 Astra Standard",
+                ShortName = "Astra Standard",
+                Icon = "✧",
+                Badge = "STANDARD",
+                Description = "최신·최고 지능 GPT · 비싸고 빨라요!",
+                RequiresBilling = true,
+                ReasoningEffort = "max"
+            },
+            new()
+            {
+                Id = "gpt-6-astra-flex",
+                ApiModelId = "gpt-6-astra",
+                Provider = ModelProvider.OpenAi,
+                DisplayName = "GPT-6 Astra Flex",
+                ShortName = "Astra Flex",
+                Icon = "✧",
+                Badge = "FLEX",
+                Description = "최신·최고 지능 GPT · 느리고 반값!",
                 RequiresBilling = true,
                 ReasoningEffort = "max",
                 ServiceTier = "flex"

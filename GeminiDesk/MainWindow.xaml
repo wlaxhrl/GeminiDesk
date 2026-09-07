@@ -1913,7 +1913,7 @@
                                        FontSize="11.5"
                                        Foreground="{StaticResource MutedBrush}"
                                        LineHeight="20"
-                                       Text="Gemini 3.1 Pro 또는 GPT Sol을 사용하세요. GPT가 훨씬 똑똑하지만 조금 더 비싸요."
+                                       Text="Gemini 3.1 Pro 또는 GPT Sol을 사용하세요. 가장 어려운 작업에는 최고 지능의 GPT-6 Astra가 좋지만 가격도 가장 높아요."
                                        TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>

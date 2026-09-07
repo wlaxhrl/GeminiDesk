@@ -322,6 +322,7 @@ public partial class MainWindow : Window
             "gemini-3.1-flash-image" => "Nano Banana 2",
             "gpt-image-2" => "GPT Image 2",
             "claude-opus-4-6" => "Claude Opus 4.6",
+            "gpt-6-astra" => "GPT-6 Astra",
             _ => _modelOptions.FirstOrDefault(model => model.Id == modelId)?.DisplayName ?? modelId
         };
     }
@@ -1431,7 +1432,7 @@ public partial class MainWindow : Window
         }
 
         MessageBox.Show(
-            $"GPT-5.6에는 현재 이미지, PDF, 문서 파일을 첨부할 수 있어요.{System.Environment.NewLine}" +
+            $"GPT 모델에는 현재 이미지, PDF, 문서 파일을 첨부할 수 있어요.{System.Environment.NewLine}" +
             $"BMP·오디오·동영상 파일은 빼 주세요: {string.Join(", ", unsupported)}",
             "GPT 첨부 형식 안내",
             MessageBoxButton.OK,
@@ -2955,6 +2956,9 @@ public sealed class ChatMessage : INotifyPropertyChanged
         "gpt-5.6-sol" => "GPT-5.6 Sol",
         "gpt-5.6-sol-standard" => "GPT-5.6 Sol Standard",
         "gpt-5.6-sol-flex" => "GPT-5.6 Sol Flex",
+        "gpt-6-astra" => "GPT-6 Astra",
+        "gpt-6-astra-standard" => "GPT-6 Astra Standard",
+        "gpt-6-astra-flex" => "GPT-6 Astra Flex",
         "gemini-3.1-flash-image" => "Nano Banana 2",
         "gpt-image-2" => "GPT Image 2",
         "claude-opus-4-6" => "Claude Opus 4.6",

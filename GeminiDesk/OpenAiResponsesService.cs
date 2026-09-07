@@ -117,9 +117,13 @@ internal sealed class OpenAiResponsesService
 
         var inputTokens = TryGetInt64(usage, "input_tokens");
         var outputTokens = TryGetInt64(usage, "output_tokens");
-        var cachedTokens = usage.TryGetProperty("input_tokens_details", out var inputDetails)
-            ? TryGetInt64(inputDetails, "cached_tokens")
-            : 0;
+        var cachedTokens = 0L;
+        var cacheWriteTokens = 0L;
+        if (usage.TryGetProperty("input_tokens_details", out var inputDetails))
+        {
+            cachedTokens = TryGetInt64(inputDetails, "cached_tokens");
+            cacheWriteTokens = TryGetInt64(inputDetails, "cache_write_tokens");
+        }
         var searchCalls = 0;
 
         if (response.TryGetProperty("output", out var output) && output.ValueKind == JsonValueKind.Array)
@@ -131,6 +135,7 @@ internal sealed class OpenAiResponsesService
         return new AiRequestUsage(
             InputTokens: inputTokens,
             CachedInputTokens: cachedTokens,
+            CacheWriteInputTokens: cacheWriteTokens,
             OutputTokens: outputTokens,
             SearchQueries: searchCalls);
     }
@@ -155,10 +160,7 @@ internal sealed class OpenAiResponsesService
             ["store"] = false
         };
 
-        if (!string.IsNullOrWhiteSpace(model.ServiceTier))
-        {
-            payload["service_tier"] = model.ServiceTier;
-        }
+        payload["service_tier"] = model.ServiceTier ?? "default";
 
         if (allowWebSearch)
         {

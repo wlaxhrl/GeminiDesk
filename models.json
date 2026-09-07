@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "models": [
     {
       "id": "gemini-3.5-flash",
@@ -60,7 +60,7 @@
       "shortName": "Sol Standard",
       "icon": "☀",
       "badge": "STANDARD",
-      "description": "제일 똑똑해요 · 비싸고 빨라요!",
+      "description": "강력한 고급형 · 비싸고 빨라요!",
       "requiresBilling": true,
       "reasoningEffort": "max"
     },
@@ -72,7 +72,32 @@
       "shortName": "Sol Flex",
       "icon": "☀",
       "badge": "FLEX",
-      "description": "제일 똑똑해요 · 느리고 반값!",
+      "description": "강력한 고급형 · 느리고 반값!",
+      "requiresBilling": true,
+      "reasoningEffort": "max",
+      "serviceTier": "flex"
+    },
+    {
+      "id": "gpt-6-astra-standard",
+      "apiModelId": "gpt-6-astra",
+      "provider": "openai",
+      "displayName": "GPT-6 Astra Standard",
+      "shortName": "Astra Standard",
+      "icon": "✧",
+      "badge": "STANDARD",
+      "description": "최신·최고 지능 GPT · 비싸고 빨라요!",
+      "requiresBilling": true,
+      "reasoningEffort": "max"
+    },
+    {
+      "id": "gpt-6-astra-flex",
+      "apiModelId": "gpt-6-astra",
+      "provider": "openai",
+      "displayName": "GPT-6 Astra Flex",
+      "shortName": "Astra Flex",
+      "icon": "✧",
+      "badge": "FLEX",
+      "description": "최신·최고 지능 GPT · 느리고 반값!",
       "requiresBilling": true,
       "reasoningEffort": "max",
       "serviceTier": "flex"

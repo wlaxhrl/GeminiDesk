@@ -319,7 +319,7 @@
                             <TextBlock FontSize="10.5"
                                        FontWeight="Bold"
                                        Foreground="#FF268865"
-                                       Text="input $2.50  /  output $15" />
+                                       Text="input $2  /  output $12" />
                         </Border>
                     </DockPanel>
                     <TextBlock Grid.Row="1"
@@ -374,7 +374,7 @@
                             <TextBlock FontSize="10.5"
                                        FontWeight="Bold"
                                        Foreground="#FF268865"
-                                       Text="input $1  /  output $6" />
+                                       Text="input $0.20  /  output $1.20" />
                         </Border>
                     </DockPanel>
                     <TextBlock Grid.Row="1"
@@ -432,7 +432,7 @@
                                 <TextBlock FontSize="9"
                                            FontWeight="Bold"
                                            Foreground="#FF268865"
-                                           Text="최고급" />
+                                           Text="고급형" />
                             </Border>
                         </StackPanel>
                         <Border DockPanel.Dock="Right"
@@ -442,7 +442,7 @@
                             <TextBlock FontSize="10.5"
                                        FontWeight="Bold"
                                        Foreground="#FF217A5B"
-                                       Text="Standard $5 / $30  ·  Flex $2.50 / $15" />
+                                       Text="Standard $4 / $20  ·  Flex $2 / $10" />
                         </Border>
                     </DockPanel>
                     <TextBlock Grid.Row="1"
@@ -450,7 +450,7 @@
                                FontSize="12.5"
                                Foreground="{StaticResource InkBrush}"
                                LineHeight="21"
-                               Text="복잡한 문제와 긴 작업을 끝까지 해결하는 최고급 만능형. Standard는 빠르고, Flex는 느리지만 반값이에요."
+                               Text="복잡한 문제와 긴 작업을 끝까지 해결하는 강력한 고급 만능형. Standard는 빠르고, Flex는 느리지만 반값이에요. 현재는 프로모션 단가예요."
                                TextWrapping="Wrap" />
                     <Grid Grid.Row="2" Margin="0,9,0,0">
                         <Grid.ColumnDefinitions>
@@ -472,6 +472,74 @@
                                    Foreground="{StaticResource MutedBrush}"
                                    LineHeight="19"
                                    Text="심층 리서치, 중요한 의사결정, 복잡한 개발, 여러 자료를 활용한 분석, PPT·보고서·재무 문서 제작"
+                                   TextWrapping="Wrap" />
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource ModelCard}"
+                    Background="#FFFFF7EA"
+                    BorderBrush="#FFF2D79E">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <DockPanel LastChildFill="False">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock VerticalAlignment="Center"
+                                       FontSize="17"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource InkBrush}"
+                                       Text="GPT-6 Astra" />
+                            <Border Margin="8,0,0,0"
+                                    Padding="7,3"
+                                    Background="#FFFFFFFF"
+                                    CornerRadius="7">
+                                <TextBlock FontSize="9"
+                                           FontWeight="Bold"
+                                           Foreground="#FFB47717"
+                                           Text="최고 지능" />
+                            </Border>
+                        </StackPanel>
+                        <Border DockPanel.Dock="Right"
+                                Padding="10,5"
+                                Background="#FFFFEBC3"
+                                CornerRadius="9">
+                            <TextBlock FontSize="10.5"
+                                       FontWeight="Bold"
+                                       Foreground="#FF98600A"
+                                       Text="Standard $10 / $50  ·  Flex $5 / $25" />
+                        </Border>
+                    </DockPanel>
+                    <TextBlock Grid.Row="1"
+                               Margin="0,9,0,0"
+                               FontSize="12.5"
+                               Foreground="{StaticResource InkBrush}"
+                               LineHeight="21"
+                               Text="가장 복잡한 추론·코딩·리서치와 긴 작업을 끝까지 해결하는 최신 최고급형. Standard는 빠르고, Flex는 느리지만 반값이에요."
+                               TextWrapping="Wrap" />
+                    <Grid Grid.Row="2" Margin="0,9,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Padding="8,3"
+                                VerticalAlignment="Top"
+                                Background="#FFFFFFFF"
+                                CornerRadius="7">
+                            <TextBlock FontSize="9.5"
+                                       FontWeight="Bold"
+                                       Foreground="#FF98600A"
+                                       Text="활용 예시" />
+                        </Border>
+                        <TextBlock Grid.Column="1"
+                                   Margin="10,1,0,0"
+                                   FontSize="11"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   LineHeight="19"
+                                   Text="고난도 에이전트 작업, 복잡한 개발, 심층 리서치, 여러 도구를 쓰는 긴 작업, 중요한 문서 제작"
                                    TextWrapping="Wrap" />
                     </Grid>
                 </Grid>
