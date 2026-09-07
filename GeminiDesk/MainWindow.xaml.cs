@@ -93,6 +93,7 @@ public partial class MainWindow : Window
         _modelOptions.AddRange(ModelCatalogService.LoadInitialCatalog());
         LoadSelectedModel();
         _chatStore.CleanupOrphanedAttachments(TimeSpan.FromDays(7));
+        CleanupStalePendingAttachments(TimeSpan.FromDays(1));
         RefreshConversations();
         RefreshSettingsView();
         ContentRendered += MainWindow_ContentRendered;
@@ -1041,6 +1042,155 @@ public partial class MainWindow : Window
         await SendMessageAsync();
     }
 
+    private void PromptBox_PasteCanExecute(object sender, CanExecuteRoutedEventArgs e)
+    {
+        if (!PromptBox.IsEnabled || _generationCancellation is not null || _editingUserMessage?.IsEditing == true)
+        {
+            e.CanExecute = false;
+            e.Handled = true;
+            return;
+        }
+
+        try
+        {
+            e.CanExecute = Clipboard.ContainsFileDropList() ||
+                           Clipboard.ContainsImage() ||
+                           Clipboard.ContainsText();
+        }
+        catch
+        {
+            e.CanExecute = false;
+        }
+
+        e.Handled = true;
+    }
+
+    private void PromptBox_PasteExecuted(object sender, ExecutedRoutedEventArgs e)
+    {
+        try
+        {
+            if (Clipboard.ContainsFileDropList())
+            {
+                AddAttachments(
+                    Clipboard.GetFileDropList()
+                        .Cast<string>()
+                        .Select(path => new AttachmentCandidate(path)),
+                    "붙여넣은");
+                e.Handled = true;
+                PromptBox.Focus();
+                return;
+            }
+
+            if (Clipboard.ContainsImage() && Clipboard.GetImage() is { } image)
+            {
+                AddAttachments([CreateClipboardImageCandidate(image)], "붙여넣은");
+                e.Handled = true;
+                PromptBox.Focus();
+                return;
+            }
+
+            if (Clipboard.ContainsText())
+            {
+                InsertPromptText(Clipboard.GetText());
+                e.Handled = true;
+            }
+        }
+        catch (Exception exception)
+        {
+            e.Handled = true;
+            MessageBox.Show(
+                $"클립보드 내용을 붙여넣지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                "붙여넣기 오류",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void InsertPromptText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        var safeStart = Math.Clamp(PromptBox.SelectionStart, 0, PromptBox.Text.Length);
+        PromptBox.SelectedText = text;
+        PromptBox.Select(safeStart + text.Length, 0);
+        PromptBox.Focus();
+    }
+
+    private void ChatComposerCard_PreviewDragEnter(object sender, DragEventArgs e)
+    {
+        UpdateAttachmentDragState(e);
+    }
+
+    private void ChatComposerCard_PreviewDragOver(object sender, DragEventArgs e)
+    {
+        UpdateAttachmentDragState(e);
+    }
+
+    private void ChatComposerCard_PreviewDragLeave(object sender, DragEventArgs e)
+    {
+        AttachmentDropOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void ChatComposerCard_PreviewDrop(object sender, DragEventArgs e)
+    {
+        AttachmentDropOverlay.Visibility = Visibility.Collapsed;
+
+        if (!TryGetDroppedFilePaths(e.Data, out var paths))
+        {
+            return;
+        }
+
+        e.Handled = true;
+        if (_generationCancellation is not null || _editingUserMessage?.IsEditing == true)
+        {
+            return;
+        }
+
+        AddAttachments(paths.Select(path => new AttachmentCandidate(path)), "끌어놓은");
+        PromptBox.Focus();
+    }
+
+    private void UpdateAttachmentDragState(DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            return;
+        }
+
+        var canAttach = _generationCancellation is null &&
+                        _editingUserMessage?.IsEditing != true &&
+                        TryGetDroppedFilePaths(e.Data, out _);
+        e.Effects = canAttach ? DragDropEffects.Copy : DragDropEffects.None;
+        AttachmentDropOverlay.Visibility = canAttach ? Visibility.Visible : Visibility.Collapsed;
+        e.Handled = true;
+    }
+
+    private static bool TryGetDroppedFilePaths(IDataObject data, out IReadOnlyList<string> paths)
+    {
+        paths = [];
+
+        try
+        {
+            if (!data.GetDataPresent(DataFormats.FileDrop) ||
+                data.GetData(DataFormats.FileDrop) is not string[] droppedPaths)
+            {
+                return false;
+            }
+
+            paths = droppedPaths
+                .Where(path => !string.IsNullOrWhiteSpace(path) && System.IO.File.Exists(path))
+                .ToList();
+            return paths.Count > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private void InsertPromptLineBreak(int selectionStart, int selectionLength)
     {
         var currentText = PromptBox.Text;
@@ -1462,7 +1612,7 @@ public partial class MainWindow : Window
     {
         _conversationHistory.Add(userContent);
         _conversationHistory.Add(CreateModelHistoryContent(modelMessage));
-        _attachments.Clear();
+        ClearPendingAttachments();
         UpdateAttachmentSummary();
 
         try
@@ -1738,7 +1888,7 @@ public partial class MainWindow : Window
         _currentConversationId = null;
         _conversationHistory.Clear();
         Messages.Clear();
-        _attachments.Clear();
+        ClearPendingAttachments();
         UpdateAttachmentSummary();
         PromptBox.Clear();
         _isUpdatingConversationSelection = true;
@@ -1754,7 +1904,7 @@ public partial class MainWindow : Window
         _currentConversationId = conversationId;
         Messages.Clear();
         _conversationHistory.Clear();
-        _attachments.Clear();
+        ClearPendingAttachments();
         UpdateAttachmentSummary();
 
         foreach (var message in storedMessages)
@@ -1889,27 +2039,75 @@ public partial class MainWindow : Window
             return;
         }
 
-        foreach (var path in dialog.FileNames)
-        {
-            var file = new FileInfo(path);
+        AddAttachments(
+            dialog.FileNames.Select(path => new AttachmentCandidate(path)),
+            "선택한");
+    }
 
-            if (_attachments.Any(item => string.Equals(item.Path, path, StringComparison.OrdinalIgnoreCase)))
+    private void ClearAttachmentsButton_Click(object sender, RoutedEventArgs e)
+    {
+        ClearPendingAttachments();
+        UpdateAttachmentSummary();
+    }
+
+    private int AddAttachments(IEnumerable<AttachmentCandidate> attachmentCandidates, string sourceLabel)
+    {
+        var candidates = attachmentCandidates.ToList();
+        var addedCount = 0;
+
+        for (var index = 0; index < candidates.Count; index++)
+        {
+            var candidate = candidates[index];
+            FileInfo file;
+            long fileLength;
+
+            try
             {
+                file = new FileInfo(candidate.Path);
+                if (!file.Exists)
+                {
+                    DiscardTemporaryAttachment(candidate);
+                    continue;
+                }
+
+                fileLength = file.Length;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                DiscardTemporaryAttachment(candidate);
+                MessageBox.Show(
+                    $"파일을 읽지 못했습니다.{System.Environment.NewLine}{exception.Message}",
+                    "첨부 오류",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
                 continue;
             }
 
-            if (file.Length > MaxFileSize)
+            if (_attachments.Any(item =>
+                    string.Equals(item.Path, file.FullName, StringComparison.OrdinalIgnoreCase)))
             {
+                DiscardTemporaryAttachment(candidate);
+                continue;
+            }
+
+            if (fileLength > MaxFileSize)
+            {
+                DiscardTemporaryAttachment(candidate);
                 MessageBox.Show(
-                    $"{file.Name}은(는) 10MB보다 커서 첨부할 수 없습니다.",
+                    $"{candidate.DisplayName ?? file.Name}은(는) 10MB보다 커서 첨부할 수 없습니다.",
                     "파일 크기 초과",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 continue;
             }
 
-            if (_attachments.Sum(item => item.Size) + file.Length > MaxTotalAttachmentSize)
+            if (_attachments.Sum(item => item.Size) + fileLength > MaxTotalAttachmentSize)
             {
+                foreach (var remainingCandidate in candidates.Skip(index))
+                {
+                    DiscardTemporaryAttachment(remainingCandidate);
+                }
+
                 MessageBox.Show(
                     "한 번에 첨부할 수 있는 파일의 총 크기는 20MB입니다.",
                     "첨부 크기 초과",
@@ -1918,28 +2116,68 @@ public partial class MainWindow : Window
                 break;
             }
 
-            var mimeType = GetMimeType(file.Extension);
-
+            var mimeType = candidate.MimeType ?? GetMimeType(file.Extension);
             if (mimeType is null)
             {
+                DiscardTemporaryAttachment(candidate);
                 MessageBox.Show(
-                    $"{file.Name} 형식은 아직 지원하지 않습니다.",
+                    $"{candidate.DisplayName ?? file.Name} 형식은 아직 지원하지 않습니다.",
                     "지원하지 않는 파일",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 continue;
             }
 
-            _attachments.Add(new AttachmentItem(file.Name, file.FullName, file.Length, mimeType));
+            _attachments.Add(new AttachmentItem(
+                candidate.DisplayName ?? file.Name,
+                file.FullName,
+                fileLength,
+                mimeType,
+                candidate.IsTemporary));
+            addedCount++;
         }
 
         UpdateAttachmentSummary();
+        if (addedCount > 0)
+        {
+            StatusText.Text = $"{sourceLabel} 파일 {addedCount}개를 첨부했어요";
+        }
+
+        return addedCount;
     }
 
-    private void ClearAttachmentsButton_Click(object sender, RoutedEventArgs e)
+    private static AttachmentCandidate CreateClipboardImageCandidate(BitmapSource image)
     {
-        _attachments.Clear();
-        UpdateAttachmentSummary();
+        var folder = PendingAttachmentFolder;
+        Directory.CreateDirectory(folder);
+        var path = Path.Combine(folder, $"{Guid.NewGuid():N}.png");
+
+        try
+        {
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(image));
+            using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            encoder.Save(stream);
+        }
+        catch
+        {
+            DeleteAttachmentFiles([path]);
+            throw;
+        }
+
+        return new AttachmentCandidate(
+            path,
+            $"붙여넣은 이미지 {DateTime.Now:yyyy-MM-dd HHmmss}.png",
+            "image/png",
+            true);
+    }
+
+    private static void DiscardTemporaryAttachment(AttachmentCandidate candidate)
+    {
+        if (candidate.IsTemporary)
+        {
+            DeleteAttachmentFiles([candidate.Path]);
+        }
     }
 
     private static IReadOnlyList<ChatAttachment> PreserveAttachments(IEnumerable<AttachmentItem> attachments)
@@ -2066,6 +2304,52 @@ public partial class MainWindow : Window
             }
         }
     }
+
+    private void ClearPendingAttachments()
+    {
+        DeleteTemporaryAttachmentFiles(_attachments);
+        _attachments.Clear();
+    }
+
+    private static void DeleteTemporaryAttachmentFiles(IEnumerable<AttachmentItem> attachments)
+    {
+        DeleteAttachmentFiles(attachments
+            .Where(attachment => attachment.IsTemporary)
+            .Select(attachment => attachment.Path));
+    }
+
+    private static void CleanupStalePendingAttachments(TimeSpan maximumAge)
+    {
+        try
+        {
+            if (!Directory.Exists(PendingAttachmentFolder))
+            {
+                return;
+            }
+
+            var oldestAllowed = DateTime.UtcNow - maximumAge;
+            foreach (var path in Directory.EnumerateFiles(PendingAttachmentFolder))
+            {
+                if (System.IO.File.GetLastWriteTimeUtc(path) < oldestAllowed)
+                {
+                    DeleteAttachmentFiles([path]);
+                }
+            }
+        }
+        catch (IOException)
+        {
+            // 다음 실행 때 다시 정리합니다.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // 다음 실행 때 다시 정리합니다.
+        }
+    }
+
+    private static string PendingAttachmentFolder => Path.Combine(
+        System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
+        "GeminiDesk",
+        "PendingAttachments");
 
     private void OpenAttachmentButton_Click(object sender, RoutedEventArgs e)
     {
@@ -2710,6 +2994,10 @@ public partial class MainWindow : Window
         ExportKeyPresetButton.IsEnabled = !isBusy;
         ImportKeyPresetButton.IsEnabled = !isBusy;
         PromptBox.IsEnabled = !isBusy && !isEditing;
+        if (isBusy || isEditing)
+        {
+            AttachmentDropOverlay.Visibility = Visibility.Collapsed;
+        }
 
         if (isBusy)
         {
@@ -2826,9 +3114,16 @@ public partial class MainWindow : Window
     {
         _generationCancellation?.Cancel();
         _generationCancellation?.Dispose();
+        ClearPendingAttachments();
         _notificationService.Dispose();
         base.OnClosed(e);
     }
+
+    private sealed record AttachmentCandidate(
+        string Path,
+        string? DisplayName = null,
+        string? MimeType = null,
+        bool IsTemporary = false);
 }
 
 public sealed record UsageDisplayItem(
@@ -3100,7 +3395,12 @@ public sealed class ChatMessage : INotifyPropertyChanged
 
 public sealed record ChatSource(string Title, string Uri);
 
-public sealed record AttachmentItem(string Name, string Path, long Size, string MimeType);
+public sealed record AttachmentItem(
+    string Name,
+    string Path,
+    long Size,
+    string MimeType,
+    bool IsTemporary = false);
 
 public sealed record ChatAttachment(
     string Name,

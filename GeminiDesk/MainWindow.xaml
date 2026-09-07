@@ -491,12 +491,18 @@
                 </StackPanel>
             </DockPanel>
 
-            <Border Grid.Row="1"
+            <Border x:Name="ChatComposerCard"
+                    Grid.Row="1"
                     Padding="18"
+                    AllowDrop="True"
                     Background="{StaticResource CardBrush}"
                     BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="1"
-                    CornerRadius="22">
+                    CornerRadius="22"
+                    PreviewDragEnter="ChatComposerCard_PreviewDragEnter"
+                    PreviewDragLeave="ChatComposerCard_PreviewDragLeave"
+                    PreviewDragOver="ChatComposerCard_PreviewDragOver"
+                    PreviewDrop="ChatComposerCard_PreviewDrop">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="18" Opacity="0.08" ShadowDepth="5" Color="#FF655B82" />
                 </Border.Effect>
@@ -865,7 +871,8 @@
                                     Padding="12,4"
                                     Style="{StaticResource SoftButton}"
                                     Click="AttachButton_Click"
-                                    Content="📎  파일 첨부" />
+                                    Content="📎  파일 첨부"
+                                    ToolTip="클릭해서 선택하거나 입력창에 붙여넣기·끌어놓기" />
                             <Button x:Name="ClearAttachmentsButton"
                                     Height="34"
                                     Margin="7,0,0,0"
@@ -895,7 +902,13 @@
                              TextBlock.LineHeight="26"
                              TextBlock.LineStackingStrategy="BlockLineHeight"
                              TextWrapping="Wrap"
-                             VerticalScrollBarVisibility="Auto" />
+                             VerticalScrollBarVisibility="Auto">
+                        <TextBox.CommandBindings>
+                            <CommandBinding Command="ApplicationCommands.Paste"
+                                            CanExecute="PromptBox_PasteCanExecute"
+                                            Executed="PromptBox_PasteExecuted" />
+                        </TextBox.CommandBindings>
+                    </TextBox>
 
                     <DockPanel Grid.Row="3" Margin="2,12,2,0" LastChildFill="False">
                         <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
@@ -933,6 +946,35 @@
                                 Click="SendButton_Click"
                                 Content="보내기  ↗" />
                     </DockPanel>
+
+                    <Border x:Name="AttachmentDropOverlay"
+                            Grid.RowSpan="4"
+                            Margin="-5"
+                            Panel.ZIndex="20"
+                            Background="#F7F5F2FF"
+                            BorderBrush="{StaticResource PrimaryBrush}"
+                            BorderThickness="2"
+                            CornerRadius="18"
+                            IsHitTestVisible="False"
+                            Visibility="Collapsed">
+                        <StackPanel HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                            <TextBlock HorizontalAlignment="Center"
+                                       FontSize="34"
+                                       Text="🐇" />
+                            <TextBlock Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       FontSize="17"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource PrimaryBrush}"
+                                       Text="여기에 놓으면 첨부돼요!" />
+                            <TextBlock Margin="0,5,0,0"
+                                       HorizontalAlignment="Center"
+                                       FontSize="11"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       Text="여러 파일을 한꺼번에 놓아도 괜찮아요" />
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </Border>
 
