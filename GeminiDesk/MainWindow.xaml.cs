@@ -35,7 +35,7 @@ public partial class MainWindow : Window
     private const long MaxFileSize = 10 * 1024 * 1024;
     private const long MaxTotalAttachmentSize = 20 * 1024 * 1024;
     private readonly List<Content> _conversationHistory = [];
-    private readonly List<AttachmentItem> _attachments = [];
+    private readonly ObservableCollection<AttachmentItem> _attachments = [];
     private readonly List<AiModelOption> _modelOptions = [];
     private readonly Dictionary<string, WindowsCredentialStore> _apiKeyCredentialStores = new()
     {
@@ -69,6 +69,7 @@ public partial class MainWindow : Window
     public ObservableCollection<ChatMessage> Messages { get; } = [];
     public ObservableCollection<ConversationSummary> Conversations { get; } = [];
     public ObservableCollection<UsageDisplayItem> UsageItems { get; } = [];
+    public ObservableCollection<AttachmentItem> PendingAttachments => _attachments;
 
     public MainWindow()
     {
@@ -2404,10 +2405,10 @@ public partial class MainWindow : Window
 
     private void UpdateAttachmentSummary()
     {
-        AttachmentSummaryText.Text = _attachments.Count == 0
-            ? "첨부 없음"
-            : string.Join(", ", _attachments.Select(item => $"{item.Name} ({FormatFileSize(item.Size)})"));
-        ClearAttachmentsButton.IsEnabled = _attachments.Count > 0 && SendButton.IsEnabled;
+        var hasAttachments = _attachments.Count > 0;
+        AttachmentSummaryText.Visibility = hasAttachments ? Visibility.Collapsed : Visibility.Visible;
+        PendingAttachmentScrollViewer.Visibility = hasAttachments ? Visibility.Visible : Visibility.Collapsed;
+        ClearAttachmentsButton.IsEnabled = hasAttachments && SendButton.IsEnabled;
     }
 
     private static string FormatFileSize(long bytes)
@@ -3400,7 +3401,23 @@ public sealed record AttachmentItem(
     string Path,
     long Size,
     string MimeType,
-    bool IsTemporary = false);
+    bool IsTemporary = false)
+{
+    public bool IsImage => MimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+
+    public string DisplaySize => Size >= 1024 * 1024
+        ? $"{Size / 1024d / 1024d:0.#}MB"
+        : $"{Math.Max(1, Size / 1024d):0.#}KB";
+
+    public string FileTypeLabel
+    {
+        get
+        {
+            var extension = System.IO.Path.GetExtension(Name).TrimStart('.').ToUpperInvariant();
+            return extension.Length is > 0 and <= 4 ? extension : "FILE";
+        }
+    }
+}
 
 public sealed record ChatAttachment(
     string Name,

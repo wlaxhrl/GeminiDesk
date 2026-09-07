@@ -882,12 +882,90 @@
                                     IsEnabled="False"
                                     Content="첨부 비우기" />
                         </StackPanel>
-                        <TextBlock x:Name="AttachmentSummaryText"
-                                   Margin="12,0,0,0"
-                                   VerticalAlignment="Center"
-                                   Foreground="{StaticResource MutedBrush}"
-                                   Text="첨부 없음"
-                                   TextTrimming="CharacterEllipsis" />
+                        <Grid Margin="12,0,0,0">
+                            <TextBlock x:Name="AttachmentSummaryText"
+                                       VerticalAlignment="Center"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       Text="첨부 없음" />
+                            <ScrollViewer x:Name="PendingAttachmentScrollViewer"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          PanningMode="HorizontalOnly"
+                                          VerticalScrollBarVisibility="Disabled"
+                                          Visibility="Collapsed">
+                                <ScrollViewer.Resources>
+                                    <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimScrollBar}" />
+                                </ScrollViewer.Resources>
+                                <ItemsControl ItemsSource="{Binding PendingAttachments}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border MinWidth="128"
+                                                    MaxWidth="230"
+                                                    MinHeight="44"
+                                                    Margin="0,0,7,0"
+                                                    Padding="5"
+                                                    Background="#FFFAF9FD"
+                                                    BorderBrush="{StaticResource BorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="10"
+                                                    ToolTip="{Binding Name}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="38" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Width="34"
+                                                            Height="34"
+                                                            HorizontalAlignment="Left"
+                                                            VerticalAlignment="Center"
+                                                            Background="{StaticResource PrimarySoftBrush}"
+                                                            CornerRadius="8">
+                                                        <Grid>
+                                                            <Image x:Name="PendingImagePreview"
+                                                                   Margin="3"
+                                                                   Source="{Binding Path, Converter={StaticResource AttachmentPreviewConverter}}"
+                                                                   Stretch="Uniform"
+                                                                   Visibility="Collapsed" />
+                                                            <TextBlock x:Name="PendingFileType"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center"
+                                                                       FontSize="8.5"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="{StaticResource PrimaryBrush}"
+                                                                       Text="{Binding FileTypeLabel}" />
+                                                        </Grid>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1"
+                                                                Margin="7,0,4,0"
+                                                                VerticalAlignment="Center">
+                                                        <TextBlock MaxWidth="172"
+                                                                   FontSize="10.5"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{StaticResource InkBrush}"
+                                                                   Text="{Binding Name}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Margin="0,2,0,0"
+                                                                   FontSize="9"
+                                                                   Foreground="{StaticResource MutedBrush}"
+                                                                   Text="{Binding DisplaySize}" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsImage}" Value="True">
+                                                    <Setter TargetName="PendingImagePreview" Property="Visibility" Value="Visible" />
+                                                    <Setter TargetName="PendingFileType" Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Grid>
                     </DockPanel>
 
                     <TextBox x:Name="PromptBox"
