@@ -2051,6 +2051,21 @@ public partial class MainWindow : Window
         UpdateAttachmentSummary();
     }
 
+    private void RemovePendingAttachmentButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_generationCancellation is not null ||
+            sender is not FrameworkElement { Tag: AttachmentItem attachment } ||
+            !_attachments.Remove(attachment))
+        {
+            return;
+        }
+
+        DeleteTemporaryAttachmentFiles([attachment]);
+        UpdateAttachmentSummary();
+        StatusText.Text = $"{attachment.Name} 첨부를 뺐어요";
+        PromptBox.Focus();
+    }
+
     private int AddAttachments(IEnumerable<AttachmentCandidate> attachmentCandidates, string sourceLabel)
     {
         var candidates = attachmentCandidates.ToList();
@@ -2995,6 +3010,7 @@ public partial class MainWindow : Window
         ExportKeyPresetButton.IsEnabled = !isBusy;
         ImportKeyPresetButton.IsEnabled = !isBusy;
         PromptBox.IsEnabled = !isBusy && !isEditing;
+        PendingAttachmentItems.IsHitTestVisible = !isBusy && !isEditing;
         if (isBusy || isEditing)
         {
             AttachmentDropOverlay.Visibility = Visibility.Collapsed;

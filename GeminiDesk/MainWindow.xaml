@@ -895,7 +895,8 @@
                                 <ScrollViewer.Resources>
                                     <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimScrollBar}" />
                                 </ScrollViewer.Resources>
-                                <ItemsControl ItemsSource="{Binding PendingAttachments}">
+                                <ItemsControl x:Name="PendingAttachmentItems"
+                                              ItemsSource="{Binding PendingAttachments}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
                                             <StackPanel Orientation="Horizontal" />
@@ -940,7 +941,7 @@
                                                         </Grid>
                                                     </Border>
                                                     <StackPanel Grid.Column="1"
-                                                                Margin="7,0,4,0"
+                                                                Margin="7,0,25,0"
                                                                 VerticalAlignment="Center">
                                                         <TextBlock MaxWidth="172"
                                                                    FontSize="10.5"
@@ -953,6 +954,18 @@
                                                                    Foreground="{StaticResource MutedBrush}"
                                                                    Text="{Binding DisplaySize}" />
                                                     </StackPanel>
+                                                    <Button Grid.Column="1"
+                                                            Width="22"
+                                                            Height="22"
+                                                            Margin="0,-2,-2,0"
+                                                            HorizontalAlignment="Right"
+                                                            VerticalAlignment="Top"
+                                                            AutomationProperties.Name="첨부파일 개별 삭제"
+                                                            Click="RemovePendingAttachmentButton_Click"
+                                                            Content="&#xE711;"
+                                                            Style="{StaticResource ResponseActionButton}"
+                                                            Tag="{Binding}"
+                                                            ToolTip="이 파일만 빼기" />
                                                 </Grid>
                                             </Border>
                                             <DataTemplate.Triggers>
