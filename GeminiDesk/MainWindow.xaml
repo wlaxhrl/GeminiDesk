@@ -445,7 +445,7 @@
                                            FontFamily="Segoe UI Variable Text, Segoe UI Emoji, Malgun Gothic"
                                            FontSize="12"
                                            FontWeight="SemiBold"
-                                           Text="3.5 Flash" />
+                                           Text="3.8 Flash" />
                                 <Border x:Name="SelectedModelBadge"
                                         Margin="7,0,0,0"
                                         Padding="5,1"
@@ -2008,7 +2008,7 @@
                                        FontSize="11.5"
                                        Foreground="{StaticResource MutedBrush}"
                                        LineHeight="20"
-                                       Text="Gemini 공홈에서 3.5 Flash를 무료로 사용하세요. Bunny Desk에서는 가장 저렴한 GPT Luna도 좋아요."
+                                       Text="Gemini 공홈에서 3.8 Flash를 무료로 사용하세요. Bunny Desk에서는 가장 저렴한 GPT Luna도 좋아요."
                                        TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>

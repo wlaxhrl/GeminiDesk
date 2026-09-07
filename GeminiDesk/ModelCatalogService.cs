@@ -39,7 +39,7 @@ public sealed record AiModelOption
 
 public static class ModelCatalogService
 {
-    private const int CurrentSchemaVersion = 7;
+    private const int CurrentSchemaVersion = 8;
     private const string RemoteCatalogUrl =
         "https://raw.githubusercontent.com/wlaxhrl/GeminiDesk/main/models.json";
 
@@ -148,13 +148,13 @@ public static class ModelCatalogService
         [
             new()
             {
-                Id = "gemini-3.5-flash",
+                Id = "gemini-3.8-flash",
                 Provider = ModelProvider.Google,
-                DisplayName = "Gemini 3.5 Flash",
-                ShortName = "3.5 Flash",
+                DisplayName = "Gemini 3.8 Flash",
+                ShortName = "3.8 Flash",
                 Icon = "⚡",
-                Badge = "STABLE",
-                Description = "빠르고 균형 잡힌 안정 버전"
+                Badge = "NEW",
+                Description = "가장 똑똑한 최신 Flash · 코딩과 복잡한 작업에 강해요"
             },
             new()
             {

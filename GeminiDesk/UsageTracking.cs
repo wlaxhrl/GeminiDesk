@@ -131,9 +131,11 @@ internal static class UsagePriceCalculator
         }
 
         var isLongGeminiPro = model.Id == "gemini-3.1-pro-preview" && usage.InputTokens > 200_000;
+        var isGeminiFlashPromotion = DateTime.UtcNow < new DateTime(2027, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var (inputRate, cachedRate, outputRate) = model.Id switch
         {
-            "gemini-3.5-flash" => (1.50, 0.15, 9.00),
+            "gemini-3.8-flash" when isGeminiFlashPromotion => (0.75, 0.075, 3.75),
+            "gemini-3.8-flash" => (1.50, 0.15, 7.50),
             "gemini-3.1-pro-preview" when isLongGeminiPro => (4.00, 0.40, 18.00),
             "gemini-3.1-pro-preview" => (2.00, 0.20, 12.00),
             _ => (0d, 0d, 0d)

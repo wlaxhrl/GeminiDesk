@@ -1,14 +1,14 @@
 {
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "models": [
     {
-      "id": "gemini-3.5-flash",
+      "id": "gemini-3.8-flash",
       "provider": "google",
-      "displayName": "Gemini 3.5 Flash",
-      "shortName": "3.5 Flash",
+      "displayName": "Gemini 3.8 Flash",
+      "shortName": "3.8 Flash",
       "icon": "⚡",
-      "badge": "STABLE",
-      "description": "빠르고 균형 잡힌 안정 버전",
+      "badge": "NEW",
+      "description": "가장 똑똑한 최신 Flash · 코딩과 복잡한 작업에 강해요",
       "requiresBilling": false
     },
     {

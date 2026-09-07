@@ -26,7 +26,8 @@ public partial class MainWindow : Window
     private const string GoogleApiKeyCredentialTarget = "GeminiDesk:GoogleGeminiApiKey";
     private const string OpenAiApiKeyCredentialTarget = "GeminiDesk:OpenAIApiKey";
     private const string AnthropicApiKeyCredentialTarget = "GeminiDesk:AnthropicApiKey";
-    private const string DefaultModelId = "gemini-3.5-flash";
+    private const string DefaultModelId = "gemini-3.8-flash";
+    private const string LegacyFlashModelId = "gemini-3.5-flash";
     private const string LegacySolModelId = "gpt-5.6-sol";
     private const string StandardSolModelId = "gpt-5.6-sol-standard";
     private const string SelectedModelSettingKey = "selected-model";
@@ -125,10 +126,15 @@ public partial class MainWindow : Window
         }
         catch
         {
-            StatusText.Text = "모델 설정을 불러오지 못해 3.5 Flash를 사용해요";
+            StatusText.Text = "모델 설정을 불러오지 못해 3.8 Flash를 사용해요";
         }
 
-        var normalizedModelId = storedModelId == LegacySolModelId ? StandardSolModelId : storedModelId;
+        var normalizedModelId = storedModelId switch
+        {
+            LegacySolModelId => StandardSolModelId,
+            LegacyFlashModelId => DefaultModelId,
+            _ => storedModelId
+        };
         var selectedModel = _modelOptions.FirstOrDefault(model => model.Id == normalizedModelId)
             ?? _modelOptions.FirstOrDefault(model => model.Id == DefaultModelId)
             ?? _modelOptions[0];
@@ -321,6 +327,7 @@ public partial class MainWindow : Window
             null or "" => "이전 응답 · 모델 정보 없음",
             "legacy-unknown" => "이전 응답 · 모델 정보 없음",
             LegacySolModelId => "GPT-5.6 Sol",
+            LegacyFlashModelId => "Gemini 3.5 Flash",
             "gemini-3.1-flash-image" => "Nano Banana 2",
             "gpt-image-2" => "GPT Image 2",
             "claude-opus-4-6" => "Claude Opus 4.6",
@@ -3261,6 +3268,7 @@ public sealed class ChatMessage : INotifyPropertyChanged
 
     private static string GetDefaultModelDisplayName(string? modelId) => modelId switch
     {
+        "gemini-3.8-flash" => "Gemini 3.8 Flash",
         "gemini-3.5-flash" => "Gemini 3.5 Flash",
         "gemini-3.1-pro-preview" => "Gemini 3.1 Pro Preview",
         "gpt-5.6-luna" => "GPT-5.6 Luna",

@@ -187,7 +187,7 @@
                                    FontSize="17"
                                    FontWeight="Bold"
                                    Foreground="{StaticResource InkBrush}"
-                                   Text="Gemini 3.5 Flash" />
+                                   Text="Gemini 3.8 Flash" />
                         <Border DockPanel.Dock="Right"
                                 Padding="10,5"
                                 Background="#FFE2F3FF"
@@ -195,7 +195,7 @@
                             <TextBlock FontSize="10.5"
                                        FontWeight="Bold"
                                        Foreground="#FF347FAE"
-                                       Text="input $1.50  /  output $9" />
+                                       Text="현재 $0.75 / $3.75*" />
                         </Border>
                     </DockPanel>
                     <TextBlock Grid.Row="1"
@@ -203,7 +203,7 @@
                                FontSize="12.5"
                                Foreground="{StaticResource InkBrush}"
                                LineHeight="21"
-                               Text="빠르게 많은 작업을 처리하면서도 추론 능력이 좋은 실무형"
+                               Text="가장 똑똑한 최신 Flash · 코딩과 복잡한 작업에 강한 실무형&#x0a;* 2026년 말까지 프로모션 가격 · 2027년부터 $1.50 / $7.50"
                                TextWrapping="Wrap" />
                     <Grid Grid.Row="2" Margin="0,9,0,0">
                         <Grid.ColumnDefinitions>
@@ -224,7 +224,7 @@
                                    FontSize="11"
                                    Foreground="{StaticResource MutedBrush}"
                                    LineHeight="19"
-                                   Text="문서 요약, 번역, 자료 분류, 챗봇, 이미지·영상 분석, 대량 콘텐츠 처리"
+                                   Text="코딩, 에이전트 작업, 복잡한 문제 해결, 문서 요약, 이미지·영상 분석, 대량 콘텐츠 처리"
                                    TextWrapping="Wrap" />
                     </Grid>
                 </Grid>
